@@ -20,10 +20,23 @@ Two main classes exist:
 1) HyperparamOptManager used for optimisation on a single machine/GPU.
 2) DistributedHyperparamOptManager for multiple GPUs on different machines.
 """
-
+# %%
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+import sys
+import os
+pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+pathProject
+
+try:
+    os.chdir(pathProject)
+except:
+    os.chdir('/app/')
+    pathProject = '/app/'
+
+sys.path.append('src')
 
 import collections
 import os
@@ -31,7 +44,8 @@ import shutil
 import libs.utils as utils
 import numpy as np
 import pandas as pd
-
+import pickle
+# %%
 Deque = collections.deque
 
 
@@ -233,6 +247,7 @@ class HyperparamOptManager:
 
     self.results.to_csv(os.path.join(self.hyperparam_folder, "results.csv"))
     self.saved_params.to_csv(os.path.join(self.hyperparam_folder, "params.csv"))
+    pickle.dump(parameters,open(os.path.join(self.hyperparam_folder, "params_pickle.pkl"),'wb'))
 
     return is_optimal
 

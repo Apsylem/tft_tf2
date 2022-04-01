@@ -14,6 +14,10 @@
 # limitations under the License.
 
 # Lint as: python3
+
+# %%
+
+
 """Temporal Fusion Transformer Model.
 
 Contains the full TFT architecture and associated components. Defines functions
@@ -23,6 +27,21 @@ for training, evaluation and prediction using simple Pandas Dataframe inputs.
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+
+
+import sys
+import os
+pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+pathProject
+
+try:
+    os.chdir(pathProject)
+except:
+    os.chdir('/app/')
+    pathProject = '/app/'
+
+sys.path.append('src')
+
 
 import gc
 import json
@@ -34,6 +53,11 @@ import libs.utils as utils
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+
+
+#policy = tf.keras.mixed_precision.Policy('mixed_float16')
+policy = tf.keras.mixed_precision.Policy('float32')
+tf.keras.mixed_precision.set_global_policy(policy)
 
 # Layer definitions.
 concat = tf.keras.backend.concatenate
@@ -49,7 +73,7 @@ Lambda = tf.keras.layers.Lambda
 
 # Default input types.
 InputTypes = data_formatters.base.InputTypes
-
+# %%
 
 # Layer utility functions.
 def linear_layer(size,
@@ -263,11 +287,11 @@ class ScaledDotProductAttention():
         Returns:
           Tuple of (layer outputs, attention weights)
         """
-        temper = tf.sqrt(tf.cast(tf.shape(input=k)[-1], dtype='float32'))
+        temper = tf.sqrt(tf.cast(tf.shape(input=k)[-1], dtype=policy.compute_dtype))
         attn = Lambda(lambda x: K.batch_dot(x[0], x[1], axes=[2, 2]) / temper)(
             [q, k])  # shape=(batch, q, k)
         if mask is not None:
-            mmask = Lambda(lambda x: (-1e+9) * (1. - K.cast(x, 'float32')))(
+            mmask = Lambda(lambda x: (-1e+9) * (1. - K.cast(x, policy.compute_dtype)))(
                 mask)  # setting to infinity
             attn = Add()([attn, mmask])
         attn = self.activation(attn)
@@ -417,7 +441,7 @@ class TemporalFusionTransformer(object):
       model: Keras model for TFT
     """
 
-    def __init__(self, raw_params, use_cudnn=False):
+    def __init__(self, raw_params, use_cudnn=False, for_prediction=False):
         """Builds TFT from parameters.
 
         Args:
@@ -431,6 +455,8 @@ class TemporalFusionTransformer(object):
 
         # Data parameters
         self.time_steps = int(params['total_time_steps'])
+        self.n_time_steps_forecasting = int(params['n_time_steps_forecasting'])
+        
         self.input_size = int(params['input_size'])
         self.output_size = int(params['output_size'])
         self.category_counts = json.loads(str(params['category_counts']))
@@ -460,10 +486,13 @@ class TemporalFusionTransformer(object):
         self.num_encoder_steps = int(params['num_encoder_steps'])
         self.num_stacks = int(params['stack_size'])
         self.num_heads = int(params['num_heads'])
-
-        # Serialisation options
+        
+        
         self._temp_folder = os.path.join(params['model_folder'], 'tmp')
-        self.reset_temp_folder()
+        # Serialisation options
+        if not for_prediction:
+            
+            self.reset_temp_folder()
 
         # Extra components to store Tensorflow nodes for attention computations
         self._input_placeholder = None
@@ -489,8 +518,10 @@ class TemporalFusionTransformer(object):
         Returns:
           Tensors for transformed inputs.
         """
-
-        time_steps = self.time_steps
+        #from util.general_util import dev_pickle
+        #dev_pickle((self, all_inputs),"get_tft_embeddings")
+        #(self, all_inputs) = dev_pickle(False,"get_tft_embeddings")
+        time_steps = self.num_encoder_steps+self.n_time_steps_forecasting
 
         # Sanity checks
         for i in self._known_regular_input_idx:
@@ -520,7 +551,7 @@ class TemporalFusionTransformer(object):
                     self.category_counts[i],
                     embedding_sizes[i],
                     input_length=time_steps,
-                    dtype=tf.float32)
+                    dtype=policy.compute_dtype)
             ])
             embeddings.append(embedding)
 
@@ -591,7 +622,7 @@ class TemporalFusionTransformer(object):
             for i in self._known_categorical_input_idx
             if i + num_regular_variables not in self._static_input_loc
         ]
-
+        
         known_combined_layer = tf.keras.backend.stack(
             known_regular_inputs + known_categorical_inputs, axis=-1)
 
@@ -616,11 +647,19 @@ class TemporalFusionTransformer(object):
           cache_key: Key used for cache
           num_samples: Maximum number of samples to extract (-1 to use all data)
         """
-
+        
         if num_samples > 0:
             TFTDataCache.update(
                 self._batch_sampled_data(data, max_samples=num_samples), cache_key)
         else:
+            #from line_profiler import LineProfiler
+            #lp = LineProfiler()
+            #lp_wrapper = lp(self._batch_data)
+            #extracted_features = lp_wrapper(data)
+            #lp.print_stats()
+            #print("lp.print_stats()",lp.print_stats())
+            #import sys
+            #sys.exit()
             TFTDataCache.update(self._batch_data(data), cache_key)
 
         print('Cached data "{}" updated'.format(cache_key))
@@ -716,9 +755,23 @@ class TemporalFusionTransformer(object):
         Returns:
           Batched Numpy array with shape=(?, self.time_steps, self.input_size)
         """
-
+        
+        
+        #dev_pickle((self, data),"_batch_data")
+        #(self, data) = dev_pickle(False,"_batch_data")
+        # %%
+        #class A():
+        #    def init():
+        #        pass  
+        #self = A()
+        #from util.general_util import dev_pickle
+        #(data,self.time_steps,id_col,time_col,target_col,self.column_definition) = dev_pickle(False,"_batch_data")
+        #self.time_steps = 40+40
+        #self.num_encoder_steps = 40
+        # %%
         # Functions.
         def _batch_single_entity(input_data):
+            
             time_steps = len(input_data)
             lags = self.time_steps
             x = input_data.values
@@ -728,39 +781,93 @@ class TemporalFusionTransformer(object):
 
             else:
                 return None
-
+        # %%
         id_col = self._get_single_col_by_type(InputTypes.ID)
         time_col = self._get_single_col_by_type(InputTypes.TIME)
         target_col = self._get_single_col_by_type(InputTypes.TARGET)
+        #from util.general_util import dev_pickle
+        #dev_pickle((data,self.time_steps,id_col,time_col,target_col,self.column_definition),"_batch_data")
+       
+        # %%
         input_cols = [
             tup[0]
             for tup in self.column_definition
             if tup[2] not in {InputTypes.ID, InputTypes.TIME}
         ]
-
+        
+      
+        sample_size = np.unique(data[id_col]).shape[0]
+        timeseries_length = int(data[id_col].shape[0]/sample_size)
+        data = data.sort_values([id_col,time_col])
+        """
+        # a more computationally intensive version, not neccecary for kidfail preprocessed data
+        # to be more prececie, herin normaly would a case multiplication be performed, this is already done in kidfail preproccessing
+        # its even safer to do it in kidfail preprocessing, because of the high sparsity, resulting in wide gaps 
+        
         data_map = {}
         for _, sliced in data.groupby(id_col):
-
+            
             col_mappings = {
                 'identifier': [id_col],
                 'time': [time_col],
                 'outputs': [target_col],
                 'inputs': input_cols
             }
-
+           
             for k in col_mappings:
                 cols = col_mappings[k]
+                
                 arr = _batch_single_entity(sliced[cols].copy())
-
+                
+                
                 if k not in data_map:
                     data_map[k] = [arr]
                 else:
                     data_map[k].append(arr)
-
+                    
         # Combine all data
         for k in data_map:
-            data_map[k] = np.concatenate(data_map[k], axis=0)
-
+            data_map[k] = np.concatenate(data_map[k], axis=0)"""
+        # %%   
+        data_map = {} 
+        col_mappings = {
+                'identifier': [id_col],
+                'time': [time_col],
+                'outputs': [target_col],
+                'inputs': input_cols
+            }
+        for k in col_mappings:
+            cols = col_mappings[k]
+            #df = data[cols].copy()
+            #arr_test = data[cols].copy().values.reshape(sample_size,self.time_steps,len(cols))
+            arr_test =  data[cols].copy().values.reshape((sample_size,timeseries_length,len(cols)))
+            if timeseries_length != self.time_steps:
+                timesteps_tp_prune_from_begin = timeseries_length-self.time_steps
+                arr_test = arr_test[:,timesteps_tp_prune_from_begin:,:]
+                assert arr_test.shape[1]==self.time_steps
+            data_base_n_time_steps_forecasting = self.time_steps-self.num_encoder_steps
+            # shorten the prediction timesteps length if it is desiered, just set the n_time_steps_forecasting in kidfail 
+            # config below the n_time_steps_forecasting from the original dataexport in kidfail project
+            if self.n_time_steps_forecasting < data_base_n_time_steps_forecasting:
+                arr_test = arr_test[:,:self.num_encoder_steps+self.n_time_steps_forecasting,:]
+                
+            #arr_test = as_array_sample_features_timesteps(data[cols].copy().values,
+            #        sample_size = sample_size,
+            #        timesteps= self.time_steps)
+            #arr_test = np.transpose(arr_test,(0,2,1))
+            
+            
+            
+            data_map[k] = arr_test
+        
+        
+        
+        # %%
+        #the was used to prove the sameness between the original aproach and our performance enhanced version
+        #assert ( np.nan_to_num(data_map['inputs'])== np.nan_to_num(data_map_test['inputs'])).min()
+      
+        
+        # %%
         # Shorten target so we only get decoder steps
         data_map['outputs'] = data_map['outputs'][:, self.num_encoder_steps:, :]
 
@@ -769,8 +876,13 @@ class TemporalFusionTransformer(object):
             data_map['active_entries'] = active_entries
         else:
             data_map['active_entries'].append(active_entries)
-
+        
+        for k,v in data_map.items():
+            print(k,v.shape)
+        # %%
         return data_map
+    
+  
 
     def _get_active_locations(self, x):
         """Formats sample weights for Keras training."""
@@ -778,9 +890,14 @@ class TemporalFusionTransformer(object):
 
     def _build_base_graph(self):
         """Returns graph defining layers of the TFT."""
-
+        # %%
+        #from util.general_util import dev_pickle
+        #dev_pickle((self),"_build_base_graph")
+        #(self) = dev_pickle(False,"_build_base_graph")
+       
+        # %%
         # Size definitions.
-        time_steps = self.time_steps
+        time_steps = self.num_encoder_steps+self.n_time_steps_forecasting
         combined_input_size = self.input_size
         encoder_steps = self.num_encoder_steps
 
@@ -790,10 +907,11 @@ class TemporalFusionTransformer(object):
                 time_steps,
                 combined_input_size,
             ))
-
+        #all_inputs
+        # %%
         unknown_inputs, known_combined_layer, obs_inputs, static_inputs \
             = self.get_tft_embeddings(all_inputs)
-
+        # %%
         # Isolate known and observed historical inputs.
         if unknown_inputs is not None:
             historical_inputs = concat([
@@ -1039,7 +1157,7 @@ class TemporalFusionTransformer(object):
 
             transformer_layer, all_inputs, attention_components \
                 = self._build_base_graph()
-
+            
             outputs = tf.keras.layers.TimeDistributed(
                 tf.keras.layers.Dense(self.output_size * len(self.quantiles))) \
                 (transformer_layer[Ellipsis, self.num_encoder_steps:, :])
@@ -1051,7 +1169,7 @@ class TemporalFusionTransformer(object):
 
             model = tf.keras.Model(inputs=all_inputs, outputs=outputs)
 
-            print(model.summary())
+          
 
             valid_quantiles = self.quantiles
             output_size = self.output_size
@@ -1106,7 +1224,9 @@ class TemporalFusionTransformer(object):
         """
 
         print('*** Fitting {} ***'.format(self.name))
-
+        print("self.get_keras_saved_path(self._temp_folder)",self.get_keras_saved_path(self._temp_folder))
+        #import sys
+        #sys.exit()
         # Add relevant callbacks
         callbacks = [
             tf.keras.callbacks.EarlyStopping(
@@ -1143,18 +1263,39 @@ class TemporalFusionTransformer(object):
         # Unpack without sample weights
         data, labels, active_flags = _unpack(train_data)
         val_data, val_labels, val_flags = _unpack(valid_data)
-
+        
+        # %%
+        # set the sample weight according to label occurence in training data
+        possible_labels, counts = np.unique(labels,return_counts=True)
+        sample_weights = 1-(counts/counts.sum())
+        for l,w in zip(possible_labels,sample_weights):
+            active_flags[np.squeeze(labels)==l] = w
+            val_flags[np.squeeze(val_labels)==l] = w
+   
+        # %%
+        print('done unpacking')
+        # %%
+        
+        #from util.general_util import dev_pickle
+        #dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection")
+        #(data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
+        
+        #(labels==np.nan).sum()
+        #active_flags
+        #np.unique(labels)
+        y_concat = np.concatenate([labels, labels, labels], axis=-1)
+        val_concat =  np.concatenate([val_labels, val_labels, val_labels],
+                                            axis=-1)
+        # %%
         all_callbacks = callbacks
-
         self.model.fit(
             x=data,
-            y=np.concatenate([labels, labels, labels], axis=-1),
+            y=y_concat,
             sample_weight=active_flags,
             epochs=self.num_epochs,
             batch_size=self.minibatch_size,
-            validation_data=(val_data,
-                             np.concatenate([val_labels, val_labels, val_labels],
-                                            axis=-1), val_flags),
+            validation_data=(val_data, val_concat
+                            , val_flags),
             callbacks=all_callbacks,
             shuffle=True,
             use_multiprocessing=True,
@@ -1238,7 +1379,7 @@ class TemporalFusionTransformer(object):
                 prediction[:, :, 0],
                 columns=[
                     't+{}'.format(i)
-                    for i in range(self.time_steps - self.num_encoder_steps)
+                    for i in range(self.n_time_steps_forecasting)
                 ])
             cols = list(flat_prediction.columns)
             flat_prediction['forecast_time'] = time[:, self.num_encoder_steps - 1, 0]
@@ -1283,7 +1424,7 @@ class TemporalFusionTransformer(object):
             for k in self._attention_components:
                 attention_weight = tf.compat.v1.keras.backend.get_session().run(
                     self._attention_components[k],
-                    {input_placeholder: input_batch.astype(np.float32)})
+                    {input_placeholder: input_batch.astype(policy.compute_dtype)})
                 attention_weights[k] = attention_weight
             return attention_weights
 
@@ -1351,6 +1492,9 @@ class TemporalFusionTransformer(object):
             model_folder,
             cp_name=self.name,
             scope=self.name)
+        
+        self.model.save_weights(os.path.join(model_folder,'best_weights.hdf5'))
+
 
     def load(self, model_folder, use_keras_loadings=False):
         """Loads TFT weights.

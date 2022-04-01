@@ -28,7 +28,7 @@ Command line args:
 
 
 """
-
+# %%
 import argparse
 import datetime as dte
 import os
@@ -46,7 +46,7 @@ ExperimentConfig = expt_settings.configs.ExperimentConfig
 HyperparamOptManager = libs.hyperparam_opt.HyperparamOptManager
 ModelClass = libs.tft_model.TemporalFusionTransformer
 tf.experimental.output_all_intermediates(True)
-
+# %%
 
 def main(expt_name,
          use_gpu,
@@ -66,7 +66,27 @@ def main(expt_name,
       use_testing_mode: Uses a smaller models and data sizes for testing purposes
         only -- switch to False to use original default settings
     """
+    # %%
+    name = 'kidfail'
+    output_folder = '/home/alexander/time_fusion_transformer/tft_outputs'
+    #output_folder = '/app/tft_outputs'
+    config = ExperimentConfig(name, output_folder)
+    formatter = config.make_data_formatter()
 
+    
+    expt_name=name
+    #use_gpu=False
+    use_gpu=True
+    model_folder=os.path.join(config.model_folder, "fixed_klein1")
+    #model_folder=os.path.join(config.model_folder, "fixed")
+    data_csv_path=config.data_csv_path
+    data_formatter=formatter
+    use_testing_mode=False
+    
+    # %%
+    data_formatter = data_formatter(klein=True)
+    #data_formatter = data_formatter(klein=False)
+    # %%
     num_repeats = 1
 
     if not isinstance(data_formatter, data_formatters.base.GenericDataFormatter):
@@ -82,14 +102,21 @@ def main(expt_name,
 
     else:
         tf_config = utils.get_default_tensorflow_config(tf_device="cpu")
-
+    print("use_gpu",use_gpu)
     print("*** Training from defined parameters for {} ***".format(expt_name))
 
     print("Loading & splitting data...")
-    raw_data = pd.read_csv(data_csv_path, index_col=0)
-    train, valid, test = data_formatter.split_data(raw_data)
+    if not data_formatter.pre_split_data_available:
+        raw_data = pd.read_csv(data_csv_path, index_col=0)
+        
+        train, valid, test = data_formatter.split_data(raw_data)
+    if data_formatter.pre_split_data_available:
+        train, valid, test = data_formatter.load_splitted_data()
+ 
+    
+    
     train_samples, valid_samples = data_formatter.get_num_samples_for_calibration()
-
+    
     # Sets up default params
     fixed_params = data_formatter.get_experiment_params()
     params = data_formatter.get_default_model_params()
@@ -111,7 +138,9 @@ def main(expt_name,
     print("Params Selected:")
     for k in params:
         print("{}: {}".format(k, params[k]))
-
+    # %%
+    opt_manager.hyperparam_folder
+    # %%
     best_loss = np.Inf
     for _ in range(num_repeats):
 
@@ -119,10 +148,13 @@ def main(expt_name,
         with tf.Graph().as_default(), tf.Session(config=tf_config) as sess:
 
             tf.keras.backend.set_session(sess)
-
+            
             params = opt_manager.get_next_parameters()
+            #from util.general_util import dev_pickle
+            #dev_pickle((params),"params")
+            #(params) = dev_pickle(False,"params")
             model = ModelClass(params, use_cudnn=use_gpu)
-
+            
             if not model.training_data_cached():
                 model.cache_batched_data(train, "train", num_samples=train_samples)
                 model.cache_batched_data(valid, "valid", num_samples=valid_samples)
@@ -137,7 +169,8 @@ def main(expt_name,
                 best_loss = val_loss
 
             tf.keras.backend.set_session(default_keras_session)
-
+    # %% 
+  
     print("*** Running tests ***")
     tf.reset_default_graph()
     with tf.Graph().as_default(), tf.Session(config=tf_config) as sess:
@@ -146,6 +179,7 @@ def main(expt_name,
         model = ModelClass(best_params, use_cudnn=use_gpu)
 
         model.load(opt_manager.hyperparam_folder)
+    
 
         print("Computing best validation loss")
         val_loss = model.evaluate(valid)
@@ -217,18 +251,18 @@ if __name__ == "__main__":
         args = parser.parse_known_args()[0]
 
         root_folder = None if args.output_folder == "." else args.output_folder
-
         return args.expt_name, root_folder, args.use_gpu == "yes"
 
-
+    # %%
     name, output_folder, use_tensorflow_with_gpu = get_args()
 
     print("Using output folder {}".format(output_folder))
 
     config = ExperimentConfig(name, output_folder)
     formatter = config.make_data_formatter()
-
+    
     # Customise inputs to main() for new datasets.
+    
     main(
         expt_name=name,
         use_gpu=use_tensorflow_with_gpu,
@@ -236,3 +270,4 @@ if __name__ == "__main__":
         data_csv_path=config.data_csv_path,
         data_formatter=formatter,
         use_testing_mode=True)  # Change to false to use original default params
+    # %%
