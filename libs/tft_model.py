@@ -455,7 +455,7 @@ class TemporalFusionTransformer(object):
 
         # Data parameters
         self.time_steps = int(params['total_time_steps'])
-        self.n_time_steps_forecasting = int(params['n_time_steps_forecasting'])
+        self.n_timesteps_forecasting = int(params['n_timesteps_forecasting'])
         
         self.input_size = int(params['input_size'])
         self.output_size = int(params['output_size'])
@@ -474,7 +474,7 @@ class TemporalFusionTransformer(object):
 
         # Network params
         self.quantiles = [0.1, 0.5, 0.9]
-        self.use_cudnn = use_cudnn  # Whether to use GPU optimised LSTM
+        #self.use_cudnn = use_cudnn  # Whether to use GPU optimised LSTM
         self.hidden_layer_size = int(params['hidden_layer_size'])
         self.dropout_rate = float(params['dropout_rate'])
         self.max_gradient_norm = float(params['max_gradient_norm'])
@@ -521,7 +521,7 @@ class TemporalFusionTransformer(object):
         #from util.general_util import dev_pickle
         #dev_pickle((self, all_inputs),"get_tft_embeddings")
         #(self, all_inputs) = dev_pickle(False,"get_tft_embeddings")
-        time_steps = self.num_encoder_steps+self.n_time_steps_forecasting
+        time_steps = self.num_encoder_steps+self.n_timesteps_forecasting
 
         # Sanity checks
         for i in self._known_regular_input_idx:
@@ -845,11 +845,11 @@ class TemporalFusionTransformer(object):
                 timesteps_tp_prune_from_begin = timeseries_length-self.time_steps
                 arr_test = arr_test[:,timesteps_tp_prune_from_begin:,:]
                 assert arr_test.shape[1]==self.time_steps
-            data_base_n_time_steps_forecasting = self.time_steps-self.num_encoder_steps
-            # shorten the prediction timesteps length if it is desiered, just set the n_time_steps_forecasting in kidfail 
-            # config below the n_time_steps_forecasting from the original dataexport in kidfail project
-            if self.n_time_steps_forecasting < data_base_n_time_steps_forecasting:
-                arr_test = arr_test[:,:self.num_encoder_steps+self.n_time_steps_forecasting,:]
+            data_base_n_timesteps_forecasting = self.time_steps-self.num_encoder_steps
+            # shorten the prediction timesteps length if it is desiered, just set the n_timesteps_forecasting in kidfail 
+            # config below the n_timesteps_forecasting from the original dataexport in kidfail project
+            if self.n_timesteps_forecasting < data_base_n_timesteps_forecasting:
+                arr_test = arr_test[:,:self.num_encoder_steps+self.n_timesteps_forecasting,:]
                 
             #arr_test = as_array_sample_features_timesteps(data[cols].copy().values,
             #        sample_size = sample_size,
@@ -897,7 +897,7 @@ class TemporalFusionTransformer(object):
        
         # %%
         # Size definitions.
-        time_steps = self.num_encoder_steps+self.n_time_steps_forecasting
+        time_steps = self.num_encoder_steps+self.n_timesteps_forecasting
         combined_input_size = self.input_size
         encoder_steps = self.num_encoder_steps
 
@@ -1055,6 +1055,7 @@ class TemporalFusionTransformer(object):
         # LSTM layer
         def get_lstm(return_state):
             """Returns LSTM cell initialized with default parameters."""
+            """ commented out, because cuda models do not run on cpu, and we will deploy in cpu
             if self.use_cudnn:
                 lstm = tf.compat.v1.keras.layers.CuDNNLSTM(
                     self.hidden_layer_size,
@@ -1062,19 +1063,19 @@ class TemporalFusionTransformer(object):
                     return_state=return_state,
                     stateful=False,
                 )
-            else:
-                lstm = tf.keras.layers.LSTM(
-                    self.hidden_layer_size,
-                    return_sequences=True,
-                    return_state=return_state,
-                    stateful=False,
-                    # Additional params to ensure LSTM matches CuDNN, See TF 2.0 :
-                    # (https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTM)
-                    activation='tanh',
-                    recurrent_activation='sigmoid',
-                    recurrent_dropout=0,
-                    unroll=False,
-                    use_bias=True)
+            else:"""
+            lstm = tf.keras.layers.LSTM(
+                self.hidden_layer_size,
+                return_sequences=True,
+                return_state=return_state,
+                stateful=False,
+                # Additional params to ensure LSTM matches CuDNN, See TF 2.0 :
+                # (https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTM)
+                activation='tanh',
+                recurrent_activation='sigmoid',
+                recurrent_dropout=0,
+                unroll=False,
+                use_bias=True)
             return lstm
 
         history_lstm, state_h, state_c \
@@ -1379,7 +1380,7 @@ class TemporalFusionTransformer(object):
                 prediction[:, :, 0],
                 columns=[
                     't+{}'.format(i)
-                    for i in range(self.n_time_steps_forecasting)
+                    for i in range(self.n_timesteps_forecasting)
                 ])
             cols = list(flat_prediction.columns)
             flat_prediction['forecast_time'] = time[:, self.num_encoder_steps - 1, 0]
@@ -1512,6 +1513,7 @@ class TemporalFusionTransformer(object):
             print('Loading model from {}'.format(serialisation_path))
             self.model.load_weights(serialisation_path)
         else:
+            print("self.name",self.name)
             # Loads tensorflow graph for optimal models.
             utils.load(
                 tf.compat.v1.keras.backend.get_session(),
@@ -1524,10 +1526,11 @@ class TemporalFusionTransformer(object):
         """Returns hyperparameter ranges for random search."""
         return {
             'dropout_rate': [0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 0.9],
-            'hidden_layer_size': [10, 20, 40, 80, 160, 240, 320],
-            'minibatch_size': [64, 128, 256],
+            'hidden_layer_size': [10, 20, 40, 80, 160],
+            'minibatch_size': [16,32,64],
             'learning_rate': [1e-4, 1e-3, 1e-2],
             'max_gradient_norm': [0.01, 1.0, 100.0],
             'num_heads': [1, 4],
             'stack_size': [1],
         }
+        
