@@ -1,3 +1,7 @@
 /venv/
 /.idea/
 /outputs/
+*.out
+*.pkl
+*.pyc
+*
