@@ -239,6 +239,7 @@ class HyperparamOptManager:
       if model is not None:
         print("Optimal model found, updating")
         model.save(self.hyperparam_folder)
+        pickle.dump(parameters,open(os.path.join(self.hyperparam_folder, "params_pickle.pkl"),'wb'))
       self.best_score = loss
       self.optimal_name = name
 
@@ -247,8 +248,8 @@ class HyperparamOptManager:
 
     self.results.to_csv(os.path.join(self.hyperparam_folder, "results.csv"))
     self.saved_params.to_csv(os.path.join(self.hyperparam_folder, "params.csv"))
-    pickle.dump(parameters,open(os.path.join(self.hyperparam_folder, "params_pickle.pkl"),'wb'))
-
+   
+    
     return is_optimal
 
 
