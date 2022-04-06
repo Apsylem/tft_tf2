@@ -21,6 +21,7 @@ Defines dataset specific column definitions and data transformations.
 # %%
 
 
+from cgi import test
 import sys
 import os
 pathProject = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
@@ -140,7 +141,7 @@ class KidfailFormatter(GenericDataFormatter):
       ('Region', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ]"""
 
-  def __init__(self,klein=False):
+  def __init__(self,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60):
     """Initialises formatter."""
 
     self.identifiers = None
@@ -150,14 +151,24 @@ class KidfailFormatter(GenericDataFormatter):
     self._num_classes_per_cat_input = None
     self.pre_split_data_available = True
     self.klein = klein
+    self.num_encoder_steps = num_encoder_steps
+    self.n_timesteps_forecasting = n_timesteps_forecasting
+    self.timeseries_interval = timeseries_interval
+    self.input_t_dim= input_t_dim
     if klein:
-      self.train_csv_path = pathProject+'/tft_outputs/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv'
-      self.valid_csv_path = pathProject+'/tft_outputs/data/kidfail/valid_kidfail_5d8e1a34_e6140289.csv'
-      self.test_csv_path = pathProject+'/tft_outputs/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv'
+      self.train_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/train_kidfail.csv'
+      self.valid_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/valid_kidfail.csv'
+      self.test_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/test_kidfail.csv'
+      #self.train_csv_path = pathProject+'/tft_outputs/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv'
+      #self.valid_csv_path = pathProject+'/tft_outputs/data/kidfail/valid_kidfail_5d8e1a34_e6140289.csv'
+      #self.test_csv_path = pathProject+'/tft_outputs/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv'
     else:
-      self.train_csv_path = pathProject+'/tft_outputs/data/kidfail/train_kidfail_777ed895_607c76c0.csv'
-      self.valid_csv_path = pathProject+'/tft_outputs/data/kidfail/valid_kidfail_777ed895_607c76c0.csv'
-      self.test_csv_path = pathProject+'/tft_outputs/data/kidfail/test_kidfail_777ed895_607c76c0.csv'
+      
+      tft_path = pathProject+f'/tft_outputs/data/kidfail'
+      output_folder = os.path.join(tft_path,f'itd_{input_t_dim}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}')
+      self.train_csv_path = os.path.join(output_folder,"train_kidfail.csv")
+      self.valid_csv_path = os.path.join(output_folder,"valid_kidfail.csv")
+      self.test_csv_path = os.path.join(output_folder,"test_kidfail.csv")
       
     
     # %%
@@ -363,17 +374,14 @@ class KidfailFormatter(GenericDataFormatter):
     """Returns fixed model parameters for experiments."""
 
     fixed_params = {
-        'total_time_steps': 56 + 20,
-        'num_encoder_steps': 56,
-        'n_time_steps_forecasting':10,
-        'num_epochs': 2,
+        'total_time_steps': self.input_t_dim+self.n_timesteps_forecasting,
+        'num_encoder_steps': self.num_encoder_steps,
+        'n_timesteps_forecasting':self.n_timesteps_forecasting,
+        'num_epochs': 200,
         'early_stopping_patience': 5,
         'multiprocessing_workers': 5,
     }
     
-    if self.klein:
-      #fixed_params.update({'total_time_steps': 120 + 40,'num_encoder_steps': 120,})
-      fixed_params.update({'total_time_steps': 56 + 20,'num_encoder_steps': 56,})
 
     return fixed_params
 
@@ -391,6 +399,6 @@ class KidfailFormatter(GenericDataFormatter):
     }
     
     if self.klein:
-      model_params.update({'hidden_layer_size': 128})
+      model_params.update({'hidden_layer_size': 16})
 
     return model_params
