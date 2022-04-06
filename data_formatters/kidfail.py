@@ -21,7 +21,6 @@ Defines dataset specific column definitions and data transformations.
 # %%
 
 
-from cgi import test
 import sys
 import os
 pathProject = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
