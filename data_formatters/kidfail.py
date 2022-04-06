@@ -140,7 +140,7 @@ class KidfailFormatter(GenericDataFormatter):
       ('Region', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ]"""
 
-  def __init__(self,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60):
+  def __init__(self,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60,num_epochs = 200):
     """Initialises formatter."""
 
     self.identifiers = None
@@ -154,6 +154,7 @@ class KidfailFormatter(GenericDataFormatter):
     self.n_timesteps_forecasting = n_timesteps_forecasting
     self.timeseries_interval = timeseries_interval
     self.input_t_dim= input_t_dim
+    self.num_epochs = num_epochs
     if klein:
       self.train_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/train_kidfail.csv'
       self.valid_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/valid_kidfail.csv'
@@ -376,7 +377,7 @@ class KidfailFormatter(GenericDataFormatter):
         'total_time_steps': self.input_t_dim+self.n_timesteps_forecasting,
         'num_encoder_steps': self.num_encoder_steps,
         'n_timesteps_forecasting':self.n_timesteps_forecasting,
-        'num_epochs': 200,
+        'num_epochs': self.num_epochs,
         'early_stopping_patience': 5,
         'multiprocessing_workers': 5,
     }
