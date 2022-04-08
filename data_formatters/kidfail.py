@@ -36,16 +36,16 @@ except:
 sys.path.append('src')
 
 # %%
-import data_formatters.base
-import libs.utils as utils
+
+from tft_tf2.data_formatters import base
+import tft_tf2.libs.utils as utils
 import sklearn.preprocessing
 import pandas as pd
-import numpy as np
+import sklearn.preprocessing
 
-
-GenericDataFormatter = data_formatters.base.GenericDataFormatter
-DataTypes = data_formatters.base.DataTypes
-InputTypes = data_formatters.base.InputTypes
+GenericDataFormatter = base.GenericDataFormatter
+DataTypes = base.DataTypes
+InputTypes = base.InputTypes
 # %%
 
 class KidfailFormatter(GenericDataFormatter):
@@ -140,7 +140,7 @@ class KidfailFormatter(GenericDataFormatter):
       ('Region', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ]"""
 
-  def __init__(self,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60,num_epochs = 200):
+  def __init__(self,root_folder,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60,num_epochs = 200):
     """Initialises formatter."""
 
     self.identifiers = None
@@ -156,15 +156,15 @@ class KidfailFormatter(GenericDataFormatter):
     self.input_t_dim= input_t_dim
     self.num_epochs = num_epochs
     if klein:
-      self.train_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/train_kidfail.csv'
-      self.valid_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/valid_kidfail.csv'
-      self.test_csv_path = pathProject+'/tft_outputs/data/kidfail/klein_itd_120_ntsf40_ti6h/test_kidfail.csv'
-      #self.train_csv_path = pathProject+'/tft_outputs/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv'
-      #self.valid_csv_path = pathProject+'/tft_outputs/data/kidfail/valid_kidfail_5d8e1a34_e6140289.csv'
-      #self.test_csv_path = pathProject+'/tft_outputs/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv'
+      self.train_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/train_kidfail.csv'
+      self.valid_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/valid_kidfail.csv'
+      self.test_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/test_kidfail.csv'
+      #self.train_csv_path = root_folder+'/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv'
+      #self.valid_csv_path = root_folder+'/data/kidfail/valid_kidfail_5d8e1a34_e6140289.csv'
+      #self.test_csv_path = root_folder+'/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv'
     else:
       
-      tft_path = pathProject+f'/tft_outputs/data/kidfail'
+      tft_path = root_folder+f'/data/kidfail'
       output_folder = os.path.join(tft_path,f'itd_{input_t_dim}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}')
       self.train_csv_path = os.path.join(output_folder,"train_kidfail.csv")
       self.valid_csv_path = os.path.join(output_folder,"valid_kidfail.csv")

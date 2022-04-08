@@ -21,12 +21,11 @@ performs z-score normalization across the entire dataset, hence re-uses most of
 the same functions as volatility.
 """
 
-import data_formatters.base
-import data_formatters.volatility
+from tft_tf2.data_formatters import base, volatility
 
-VolatilityFormatter = data_formatters.volatility.VolatilityFormatter
-DataTypes = data_formatters.base.DataTypes
-InputTypes = data_formatters.base.InputTypes
+VolatilityFormatter = volatility.VolatilityFormatter
+DataTypes = base.DataTypes
+InputTypes = base.InputTypes
 
 
 class TrafficFormatter(VolatilityFormatter):
