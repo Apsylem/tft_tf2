@@ -41,6 +41,7 @@ from tft_tf2.data_formatters import base
 import tft_tf2.libs.utils as utils
 import sklearn.preprocessing
 import pandas as pd
+import numpy as np
 import sklearn.preprocessing
 
 GenericDataFormatter = base.GenericDataFormatter
@@ -109,6 +110,8 @@ class KidfailFormatter(GenericDataFormatter):
     ('ops_autoenc_9', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('ops_autoenc_10', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('ops_autoenc_11', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
+    ('ops_autoenc_12', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
+    ('ops_autoenc_13', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_0', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_1', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_2', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
@@ -116,8 +119,6 @@ class KidfailFormatter(GenericDataFormatter):
     ('fab_autoenc_4', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_5', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_6', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
-    ('fab_autoenc_7', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
-    ('fab_autoenc_8', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT),
     ('fall_age', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
     ('fall_female', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ('fall_kreaNormRangeMin', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
@@ -156,9 +157,9 @@ class KidfailFormatter(GenericDataFormatter):
     self.input_t_dim= input_t_dim
     self.num_epochs = num_epochs
     if klein:
-      self.train_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/train_kidfail.csv'
-      self.valid_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/valid_kidfail.csv'
-      self.test_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/test_kidfail.csv'
+      self.train_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/train_kidfail.csv'
+      self.valid_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/valid_kidfail.csv'
+      self.test_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/test_kidfail.csv'
       #self.train_csv_path = root_folder+'/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv'
       #self.valid_csv_path = root_folder+'/data/kidfail/valid_kidfail_5d8e1a34_e6140289.csv'
       #self.test_csv_path = root_folder+'/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv'
