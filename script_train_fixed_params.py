@@ -29,9 +29,22 @@ Command line args:
 
 """
 # %%
+import os
+import sys
+pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+#pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+pathProject
+# %%
+try:
+    os.chdir(pathProject)
+except:
+    os.chdir('/app')
+    pathProject = '/app'
+    
+# %%
+sys.path.insert(0,pathProject)
 import argparse
 import datetime as dte
-import os
 
 import data_formatters.base
 import expt_settings.configs
@@ -172,7 +185,7 @@ def main(expt_name,
 
             tf.keras.backend.set_session(default_keras_session)
     # %% 
-  
+    
     print("*** Running tests ***")
     tf.reset_default_graph()
     with tf.Graph().as_default(), tf.Session(config=tf_config) as sess:
@@ -193,7 +206,7 @@ def main(expt_name,
         p90_forecast = data_formatter.format_predictions(output_map["p90"])
 
         def extract_numerical_data(data):
-            """Strips out forecast time and identifier columns."""
+            #Strips out forecast time and identifier columns.
             return data[[
                 col for col in data.columns
                 if col not in {"forecast_time", "identifier"}
@@ -218,7 +231,7 @@ def main(expt_name,
     print("Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
         p50_loss.mean(), p90_loss.mean()))
     
-    print(f"took {time_to_fit} seconds for {params['epochs']} epochs to fit with gpu {use_gpu}")
+    print(f"took {time_to_fit} seconds for {params['num_epochs']} epochs to fit with gpu {use_gpu}")
 
 if __name__ == "__main__":
     def get_args():
@@ -324,3 +337,5 @@ if __name__ == "__main__":
         )  # Change to false to use original default params
     # %%
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs/ -use_gpu yes -use_testing_mode no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 6 -input_t_dim 120 -num_epochs 1
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs/ -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 56 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000
+#took 106.69269490242004 seconds for 1 epochs to fit with gpu True
