@@ -40,9 +40,9 @@ except:
     os.chdir('/app/')
     pathProject = '/app/'
 
-sys.path.append('src')
+sys.path.append(pathProject)
 
-
+print("sys.path",sys.path)
 import gc
 import json
 import os
@@ -54,7 +54,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-
+# %%
 #policy = tf.keras.mixed_precision.Policy('mixed_float16')
 policy = tf.keras.mixed_precision.Policy('float32')
 tf.keras.mixed_precision.set_global_policy(policy)
