@@ -29,9 +29,22 @@ Command line args:
 
 """
 # %%
+import os
+import sys
+pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+#pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+pathProject
+# %%
+try:
+    os.chdir(pathProject)
+except:
+    os.chdir('/app')
+    pathProject = '/app'
+    
+# %%
+sys.path.insert(0,pathProject)
 import argparse
 import datetime as dte
-import os
 
 import data_formatters.base
 import expt_settings.configs
@@ -87,11 +100,11 @@ def main(expt_name,
     
     # %%
     num_repeats = 1
-
+    """
     if not isinstance(data_formatter, data_formatters.base.GenericDataFormatter):
         raise ValueError(
             "Data formatters should inherit from" +
-            "AbstractDataFormatter! Type={}".format(type(data_formatter)))
+            "AbstractDataFormatter! Type={}".format(type(data_formatter)))"""
 
     # Tensorflow setup
     default_keras_session = tf.keras.backend.get_session()
@@ -172,7 +185,7 @@ def main(expt_name,
 
             tf.keras.backend.set_session(default_keras_session)
     # %% 
-  
+    
     print("*** Running tests ***")
     tf.reset_default_graph()
     with tf.Graph().as_default(), tf.Session(config=tf_config) as sess:
@@ -193,7 +206,7 @@ def main(expt_name,
         p90_forecast = data_formatter.format_predictions(output_map["p90"])
 
         def extract_numerical_data(data):
-            """Strips out forecast time and identifier columns."""
+            #Strips out forecast time and identifier columns.
             return data[[
                 col for col in data.columns
                 if col not in {"forecast_time", "identifier"}
@@ -218,7 +231,7 @@ def main(expt_name,
     print("Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
         p50_loss.mean(), p90_loss.mean()))
     
-    print(f"took {time_to_fit} seconds for {params['epochs']} epochs to fit with gpu {use_gpu}")
+    print(f"took {time_to_fit} seconds for {params['num_epochs']} epochs to fit with gpu {use_gpu}")
 
 if __name__ == "__main__":
     def get_args():
@@ -290,6 +303,12 @@ if __name__ == "__main__":
                 nargs='?',
                 default=200,
                 help="how many epochs to train")
+        parser.add_argument(
+                "-lr",      
+                type=float,
+                nargs='?',
+                default=0.0001,
+                help="base lr")
    
         args = parser.parse_known_args()[0]
 
@@ -297,30 +316,42 @@ if __name__ == "__main__":
     
         return args.expt_name, root_folder, args.use_gpu == 'yes', \
             args.use_testing_mode == 'yes', args.klein == 'yes',\
-            args.num_encoder_steps,args.n_timesteps_forecasting,args.timeseries_interval,args.input_t_dim,args.num_epochs
+            args.num_encoder_steps,args.n_timesteps_forecasting,args.timeseries_interval,args.input_t_dim,args.num_epochs, \
+            args.lr
 
     # Load settings for default experiments
-    name, folder, use_tensorflow_with_gpu, use_testing_mode, klein, num_encoder_steps,n_timesteps_forecasting,timeseries_interval,input_t_dim,num_epochs = get_args()
-
+    name, folder, use_tensorflow_with_gpu, use_testing_mode, klein, num_encoder_steps,n_timesteps_forecasting,timeseries_interval,input_t_dim,num_epochs, lr = get_args()
+    
+    
+    
     print("Using output folder {}".format(folder))
-
+    
     config = ExperimentConfig(name, folder)
     formatter = config.make_data_formatter()
-    formatter = formatter(klein=klein,
+    formatter = formatter(root_folder=folder,
+                        klein=klein,
                         num_encoder_steps = num_encoder_steps ,
                         n_timesteps_forecasting = n_timesteps_forecasting,
                         timeseries_interval = timeseries_interval,
                         input_t_dim = input_t_dim,
-                        num_epochs = num_epochs)
+                        num_epochs = num_epochs,
+                        lr = lr)
     # Customise inputs to main() for new datasets.
     
     main(
         expt_name=name,
         use_gpu=use_tensorflow_with_gpu,
-        model_folder=os.path.join(config.model_folder,f"fixed_testing_{use_testing_mode}_itd_{input_t_dim}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}"),
+        model_folder=os.path.join(config.model_folder,f"fixed_{use_testing_mode}_itd_{input_t_dim}_nes_{num_encoder_steps}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}_lr_{lr}"),
         data_csv_path=config.data_csv_path,
         data_formatter=formatter,
         use_testing_mode=use_testing_mode,
         )  # Change to false to use original default params
     # %%
-#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs/ -use_gpu yes -use_testing_mode no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 6 -input_t_dim 120 -num_epochs 1
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 6 -input_t_dim 120 -num_epochs 1
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 56 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.00001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 20 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.00001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.000001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.0000001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 6 -timeseries_interval 12 -input_t_dim 60 -num_epochs 1000 -lr 0.000001
+#took 106.69269490242004 seconds for 1 epochs to fit with gpu True
+

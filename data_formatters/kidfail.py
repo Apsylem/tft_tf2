@@ -41,6 +41,7 @@ from tft_tf2.data_formatters import base
 import tft_tf2.libs.utils as utils
 import sklearn.preprocessing
 import pandas as pd
+import numpy as np
 import sklearn.preprocessing
 
 GenericDataFormatter = base.GenericDataFormatter
@@ -109,6 +110,8 @@ class KidfailFormatter(GenericDataFormatter):
     ('ops_autoenc_9', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('ops_autoenc_10', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('ops_autoenc_11', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
+    ('ops_autoenc_12', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
+    ('ops_autoenc_13', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_0', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_1', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_2', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
@@ -116,8 +119,6 @@ class KidfailFormatter(GenericDataFormatter):
     ('fab_autoenc_4', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_5', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fab_autoenc_6', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
-    ('fab_autoenc_7', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
-    ('fab_autoenc_8', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT),
     ('fall_age', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
     ('fall_female', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ('fall_kreaNormRangeMin', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
@@ -140,7 +141,7 @@ class KidfailFormatter(GenericDataFormatter):
       ('Region', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ]"""
 
-  def __init__(self,root_folder,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60,num_epochs = 200):
+  def __init__(self,root_folder,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60,num_epochs = 200, lr = 0.0001):
     """Initialises formatter."""
 
     self.identifiers = None
@@ -155,17 +156,18 @@ class KidfailFormatter(GenericDataFormatter):
     self.timeseries_interval = timeseries_interval
     self.input_t_dim= input_t_dim
     self.num_epochs = num_epochs
+    self.lr = lr
     if klein:
-      self.train_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/train_kidfail.csv'
-      self.valid_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/valid_kidfail.csv'
-      self.test_csv_path = root_folder+'/data/kidfail/klein_itd_120_ntsf40_ti6h/test_kidfail.csv'
+      self.train_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/train_kidfail.csv'
+      self.valid_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/valid_kidfail.csv'
+      self.test_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/test_kidfail.csv'
       #self.train_csv_path = root_folder+'/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv'
       #self.valid_csv_path = root_folder+'/data/kidfail/valid_kidfail_5d8e1a34_e6140289.csv'
       #self.test_csv_path = root_folder+'/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv'
     else:
       
       tft_path = root_folder+f'/data/kidfail'
-      output_folder = os.path.join(tft_path,f'itd_{input_t_dim}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}')
+      output_folder = os.path.join(tft_path,f'itd_{input_t_dim}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}h')
       self.train_csv_path = os.path.join(output_folder,"train_kidfail.csv")
       self.valid_csv_path = os.path.join(output_folder,"valid_kidfail.csv")
       self.test_csv_path = os.path.join(output_folder,"test_kidfail.csv")
@@ -391,7 +393,7 @@ class KidfailFormatter(GenericDataFormatter):
     model_params = {
         'dropout_rate': 0.3,
         'hidden_layer_size': 128,
-        'learning_rate': 0.001,
+        'learning_rate': self.lr,
         'minibatch_size': 64,
         'max_gradient_norm': 0.01,
         'num_heads': 1,

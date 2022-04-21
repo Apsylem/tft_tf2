@@ -797,6 +797,8 @@ class TemporalFusionTransformer(object):
         
       
         sample_size = np.unique(data[id_col]).shape[0]
+        # timeseries length can be calculated by deviding the length of the id column with the amount of unique ids
+        # this is due to the fact, that every case contains the exact same amount of timesteps
         timeseries_length = int(data[id_col].shape[0]/sample_size)
         data = data.sort_values([id_col,time_col])
         """
@@ -836,21 +838,37 @@ class TemporalFusionTransformer(object):
                 'outputs': [target_col],
                 'inputs': input_cols
             }
-        for k in col_mappings:
-            cols = col_mappings[k]
+        
+        # iterate over col mappings
+        for k, cols in col_mappings.items():
+            
             #df = data[cols].copy()
             #arr_test = data[cols].copy().values.reshape(sample_size,self.time_steps,len(cols))
-            arr_test =  data[cols].copy().values.reshape((sample_size,timeseries_length,len(cols)))
-            if timeseries_length != self.time_steps:
-                timesteps_tp_prune_from_begin = timeseries_length-self.time_steps
-                arr_test = arr_test[:,timesteps_tp_prune_from_begin:,:]
-                assert arr_test.shape[1]==self.time_steps
-            data_base_n_timesteps_forecasting = self.time_steps-self.num_encoder_steps
+            # get the values of pd.Dataframe columns by colum name selection
+            # reshape from 2d to the desiered 3 dim input
+            arr =  data[cols].copy().values.reshape((sample_size,timeseries_length,len(cols))) 
+            # If the timesteps selected for modelling are below the given length of timesteps from the dataset
+            if timeseries_length > self.num_encoder_steps+self.n_timesteps_forecasting:
+            
+                # get the difference between actual and desiered timesteps
+                timesteps_to_prune_from_begin = timeseries_length-(self.num_encoder_steps+self.n_timesteps_forecasting)
+                # and cut the difference from the beginn of each timeseries,
+                # the delivered timeseries ist front padded, so the highest informations densitiy is expected at the end of the series
+                # so for most cases, mssing data will be cut out
+                arr = arr[:,timesteps_to_prune_from_begin:,:]
+                assert arr.shape[1]==(self.num_encoder_steps+self.n_timesteps_forecasting)
+                
+            # the following is deprecated, due to the decision, to deliver the n_timesteps_forecasting, as fixed per experiment
+            # this decision was made due to possible dependencies in bfilling future classes in data to predict
+            # since self.time_steps consists of num_encoder_step + forecasting time, 
+            # we can recalculate the forecasting time here 
+            #data_base_n_timesteps_forecasting = self.time_steps-self.num_encoder_steps
             # shorten the prediction timesteps length if it is desiered, just set the n_timesteps_forecasting in kidfail 
             # config below the n_timesteps_forecasting from the original dataexport in kidfail project
-            if self.n_timesteps_forecasting < data_base_n_timesteps_forecasting:
-                arr_test = arr_test[:,:self.num_encoder_steps+self.n_timesteps_forecasting,:]
-                
+            # the same shortening of timeseries can be applied from the end of the series
+            #if self.n_timesteps_forecasting < data_base_n_timesteps_forecasting:
+            #    arr = arr[:,:self.num_encoder_steps+self.n_timesteps_forecasting,:]
+            
             #arr_test = as_array_sample_features_timesteps(data[cols].copy().values,
             #        sample_size = sample_size,
             #        timesteps= self.time_steps)
@@ -858,8 +876,7 @@ class TemporalFusionTransformer(object):
             
             
             
-            data_map[k] = arr_test
-        
+            data_map[k] = arr        
         
         
         # %%

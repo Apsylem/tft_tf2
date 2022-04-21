@@ -19,11 +19,26 @@
 Performs random search to optimize hyperparameters on a single machine. For new
 datasets, inputs to the main(...) should be customised.
 """
-
+# %%
+import os
+import sys
+pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+#pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+pathProject
+# %%
+try:
+    os.chdir(pathProject)
+except:
+    os.chdir('/app')
+    pathProject = '/app'
+    
+# %%
+sys.path.insert(0,pathProject)
 import argparse
 import datetime as dte
-import os
 
+import sys
+sys.path.append(pathProject)
 import data_formatters.base
 import expt_settings.configs
 import libs.hyperparam_opt
@@ -53,10 +68,10 @@ def main(expt_name, use_gpu, restart_opt, model_folder, hyperparam_iterations,
       expt_settings.dataformatter.GenericDataFormatter)
   """
   
-  if not isinstance(data_formatter, data_formatters.base.GenericDataFormatter):
-    raise ValueError(
-        "Data formatters should inherit from" +
-        "AbstractDataFormatter! Type={}".format(type(data_formatter)))
+  #if not isinstance(data_formatter, data_formatters.base.GenericDataFormatter):
+  #  raise ValueError(
+  #      "Data formatters should inherit from" +
+  #      "AbstractDataFormatter! Type={}".format(type(data_formatter)))
 
   default_keras_session = tf.compat.v1.keras.backend.get_session()
 
@@ -241,11 +256,15 @@ if __name__ == "__main__":
             nargs='?',
             default=120,
             help="how long one timeseries intervall should be")
-#-expt_name kidfail -output_folder /app/tft_outputs/ -use_gpu yes -restart_hyperparam_opt no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 5 -input_t_dim 120
+#-expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -restart_hyperparam_opt no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 5 -input_t_dim 120
     args = parser.parse_known_args()[0]
 
     root_folder = None if args.output_folder == "." else args.output_folder
-  
+    print("args.use_gpu",args.use_gpu)
+    print("args.timeseries_interval",args.timeseries_interval)
+    print("args.klein",args.klein)
+    import sys
+    sys.exit()
     return args.expt_name, root_folder, args.use_gpu == 'yes', \
         args.restart_hyperparam_opt == 'yes', args.klein == 'yes',\
         args.num_encoder_steps,args.n_timesteps_forecasting,args.timeseries_interval,args.input_t_dim,
@@ -253,10 +272,11 @@ if __name__ == "__main__":
   # Load settings for default experiments
   name, folder, use_tensorflow_with_gpu, restart, klein, num_encoder_steps,n_timesteps_forecasting,timeseries_interval,input_t_dim = get_args()
 
-
+  
   config = ExperimentConfig(name, folder)
   formatter = config.make_data_formatter()
-  formatter = formatter(klein=klein,
+  formatter = formatter(config.root_folder,
+                        klein=klein,
                         num_encoder_steps = num_encoder_steps ,
                         n_timesteps_forecasting = n_timesteps_forecasting,
                         timeseries_interval = timeseries_interval,
