@@ -20,15 +20,30 @@ Contains the default output paths for data, serialised models and predictions
 for the main experiments used in the publication.
 """
 
+# %%
+
+
+import sys
 import os
+pathProject = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+#pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+pathProject
+# %%
+try:
+    os.chdir(pathProject)
+except:
+    os.chdir('/app/')
+    pathProject = '/app/'
 
-import tft_tf2.data_formatters.electricity
-import tft_tf2.data_formatters.favorita
-import tft_tf2.data_formatters.traffic
-import tft_tf2.data_formatters.volatility
-import tft_tf2.data_formatters.kidfail
 
+# %%
+from tft_tf2.data_formatters import electricity
+from tft_tf2.data_formatters import favorita
+from tft_tf2.data_formatters import traffic
+from tft_tf2.data_formatters import volatility
+from tft_tf2.data_formatters import kidfail
 
+# %%
 class ExperimentConfig(object):
   """Defines experiment configs and paths to outputs.
 
@@ -91,7 +106,7 @@ class ExperimentConfig(object):
   @property
   def hyperparam_iterations(self):
 
-    return 240 if self.experiment == 'volatility' else 60
+    return 240 if self.experiment == 'volatility' else 10
 
   def make_data_formatter(self):
     """Gets a data formatter object for experiment.
@@ -101,11 +116,11 @@ class ExperimentConfig(object):
     """
 
     data_formatter_class = {
-        'volatility': data_formatters.volatility.VolatilityFormatter,
-        'electricity': data_formatters.electricity.ElectricityFormatter,
-        'traffic': data_formatters.traffic.TrafficFormatter,
-        'favorita': data_formatters.favorita.FavoritaFormatter,
-        'kidfail': data_formatters.kidfail.KidfailFormatter
+        'volatility': volatility.VolatilityFormatter,
+        'electricity': electricity.ElectricityFormatter,
+        'traffic': traffic.TrafficFormatter,
+        'favorita': favorita.FavoritaFormatter,
+        'kidfail': kidfail.KidfailFormatter
     }
 
     return data_formatter_class[self.experiment]
