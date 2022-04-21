@@ -256,7 +256,7 @@ if __name__ == "__main__":
             nargs='?',
             default=120,
             help="how long one timeseries intervall should be")
-#-expt_name kidfail -output_folder /app/tft_outputs/ -use_gpu yes -restart_hyperparam_opt no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 5 -input_t_dim 120
+#-expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -restart_hyperparam_opt no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 5 -input_t_dim 120
     args = parser.parse_known_args()[0]
 
     root_folder = None if args.output_folder == "." else args.output_folder
