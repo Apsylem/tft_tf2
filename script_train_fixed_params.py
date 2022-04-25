@@ -28,6 +28,7 @@ Command line args:
 
 
 """
+
 # %%
 import os
 import sys
@@ -46,6 +47,16 @@ sys.path.insert(0,pathProject)
 import argparse
 import datetime as dte
 
+import tensorflow.compat.v1 as tf
+
+
+"""# Disable all GPUS
+tf.config.set_visible_devices([], 'GPU')
+visible_devices = tf.config.get_visible_devices()
+for device in visible_devices:
+    assert device.device_type != 'GPU'"""
+
+
 import data_formatters.base
 import expt_settings.configs
 import libs.hyperparam_opt
@@ -53,7 +64,9 @@ import libs.tft_model
 import libs.utils as utils
 import numpy as np
 import pandas as pd
-import tensorflow.compat.v1 as tf
+import pickle
+
+
 
 ExperimentConfig = expt_settings.configs.ExperimentConfig
 HyperparamOptManager = libs.hyperparam_opt.HyperparamOptManager
@@ -131,7 +144,13 @@ def main(expt_name,
     fixed_params = data_formatter.get_experiment_params()
     params = data_formatter.get_default_model_params()
     params["model_folder"] = model_folder
-
+    
+    if not os.path.isdir(model_folder):
+        os.makedirs(model_folder)
+    #save the data formater
+    pickle.dump(data_formatter,open(os.path.join(model_folder,"data_formatter.pkl"),'wb'))
+    
+    
     # Parameter overrides for testing only! Small sizes used to speed up script.
     if use_testing_mode:
         fixed_params["num_epochs"] = 1
@@ -148,9 +167,7 @@ def main(expt_name,
     print("Params Selected:")
     for k in params:
         print("{}: {}".format(k, params[k]))
-    # %%
-    opt_manager.hyperparam_folder
-    # %%
+   
     best_loss = np.Inf
     for _ in range(num_repeats):
 
@@ -353,5 +370,12 @@ if __name__ == "__main__":
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.000001
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.0000001
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 6 -timeseries_interval 12 -input_t_dim 60 -num_epochs 1000 -lr 0.000001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 56 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.01
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 20 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 1 -timeseries_interval 48 -input_t_dim 60 -num_epochs 1000 -lr 0.001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 20 -n_timesteps_forecasting 4 -timeseries_interval 6 -input_t_dim 60 -num_epochs 1000 -lr 0.001
 #took 106.69269490242004 seconds for 1 epochs to fit with gpu True
+#took 100.74724411964417 seconds for 1 epochs to fit with gpu False
 
+# max while using gpu ram was 50 GB
+# max whithout gpu ram was also 50 GB
