@@ -31,7 +31,7 @@ from __future__ import print_function
 
 import sys
 import os
-pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+pathProject = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 pathProject
 
 try:
@@ -755,7 +755,7 @@ class TemporalFusionTransformer(object):
         Returns:
           Batched Numpy array with shape=(?, self.time_steps, self.input_size)
         """
-        
+        # %%
         
         #dev_pickle((self, data),"_batch_data")
         #(self, data) = dev_pickle(False,"_batch_data")
@@ -764,11 +764,11 @@ class TemporalFusionTransformer(object):
         #    def init():
         #        pass  
         #self = A()
-        #from util.general_util import dev_pickle
-        #(data,self.time_steps,id_col,time_col,target_col,self.column_definition) = dev_pickle(False,"_batch_data")
+        #from tft_tf2.util.general_util import dev_pickle
+        #(data,self.time_steps,id_col,time_col,target_col,self.column_definition,self.num_encoder_steps,self.n_timesteps_forecasting) = dev_pickle(False,"_batch_data")
         #self.time_steps = 40+40
         #self.num_encoder_steps = 40
-        # %%
+        
         # Functions.
         def _batch_single_entity(input_data):
             
@@ -786,7 +786,7 @@ class TemporalFusionTransformer(object):
         time_col = self._get_single_col_by_type(InputTypes.TIME)
         target_col = self._get_single_col_by_type(InputTypes.TARGET)
         #from util.general_util import dev_pickle
-        #dev_pickle((data,self.time_steps,id_col,time_col,target_col,self.column_definition),"_batch_data")
+        #dev_pickle((data,self.time_steps,id_col,time_col,target_col,self.column_definition,self.num_encoder_steps,self.n_timesteps_forecasting),"_batch_data")
        
         # %%
         input_cols = [
@@ -795,12 +795,13 @@ class TemporalFusionTransformer(object):
             if tup[2] not in {InputTypes.ID, InputTypes.TIME}
         ]
         
-      
+        # %%
         sample_size = np.unique(data[id_col]).shape[0]
         # timeseries length can be calculated by deviding the length of the id column with the amount of unique ids
         # this is due to the fact, that every case contains the exact same amount of timesteps
         timeseries_length = int(data[id_col].shape[0]/sample_size)
         data = data.sort_values([id_col,time_col])
+        # %%
         """
         # a more computationally intensive version, not neccecary for kidfail preprocessed data
         # to be more prececie, herin normaly would a case multiplication be performed, this is already done in kidfail preproccessing
@@ -848,6 +849,7 @@ class TemporalFusionTransformer(object):
             # reshape from 2d to the desiered 3 dim input
             arr =  data[cols].copy().values.reshape((sample_size,timeseries_length,len(cols))) 
             # If the timesteps selected for modelling are below the given length of timesteps from the dataset
+           
             if timeseries_length > self.num_encoder_steps+self.n_timesteps_forecasting:
             
                 # get the difference between actual and desiered timesteps
@@ -887,7 +889,15 @@ class TemporalFusionTransformer(object):
         # %%
         # Shorten target so we only get decoder steps
         data_map['outputs'] = data_map['outputs'][:, self.num_encoder_steps:, :]
-
+        # %%
+        
+        # %%
+        #FIXME only for testing porpuses, the remaining Target Data in X, will be set to -1
+        # as i understood the time fusuion transformer, this target value should not be transmitted to the model, allthoough it is given to the model via input
+        data_map['inputs'][:,-1,col_mappings['inputs'].index(col_mappings['outputs'][0])] = -1
+        # %%
+        #np.unique(data_map['inputs'][:,:,col_mappings['inputs'].index(col_mappings['outputs'][0])])
+        # %%
         active_entries = np.ones_like(data_map['outputs'])
         if 'active_entries' not in data_map:
             data_map['active_entries'] = active_entries
@@ -1251,6 +1261,17 @@ class TemporalFusionTransformer(object):
                 monitor='val_loss',
                 patience=self.early_stopping_patience,
                 min_delta=1e-4),
+            #this callback multiplies the learning rate by a difined faktor
+            # if the validation_loss has not changed for patience Epochs
+            tf.keras.callbacks.ReduceLROnPlateau(
+                monitor='val_loss',
+                factor=0.8,
+                patience=2,
+                verbose=1,
+                mode='auto',
+                min_delta=0.0000001,
+                cooldown=1,
+                min_lr=0),
             tf.keras.callbacks.ModelCheckpoint(
                 filepath=self.get_keras_saved_path(self._temp_folder),
                 monitor='val_loss',
@@ -1294,10 +1315,30 @@ class TemporalFusionTransformer(object):
         print('done unpacking')
         # %%
         
-        #from util.general_util import dev_pickle
+        #from tft_tf2.util.general_util import dev_pickle
         #dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection")
         #(data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
+        # %%
+        """
+        np.unique(val_labels)
         
+        # %%
+        val_data.max(axis=(0,1))
+        np.unique(val_data[:,10,61])
+        # %%
+        val_data[val_data==4] = 0
+        (val_data[:,9,61] != val_data[:,10,61]).sum()
+        # %%
+        (np.squeeze(val_labels)!=val_data[:,10,61]).sum()
+        # %%
+        (val_labels!=0).sum()
+        # %%
+        val_data[:,10,61].shape"""
+        # %%
+        #raw_val = pd.read_csv('/home/alexander/time_fusion_transformer/tft_outputs/data/kidfail/itd_60_ntsf1_ti48h/valid_kidfail.csv')
+        # %%
+        #pd.unique(raw_val['icd_17_9x'])
+        # %%
         #(labels==np.nan).sum()
         #active_flags
         #np.unique(labels)
