@@ -26,7 +26,7 @@ import os
 pathProject = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 #pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 pathProject
-# %%
+
 try:
     os.chdir(pathProject)
 except:
@@ -35,7 +35,7 @@ except:
 
 sys.path.append('src')
 
-# %%
+
 
 from tft_tf2.data_formatters import base
 import tft_tf2.libs.utils as utils
@@ -121,8 +121,8 @@ class KidfailFormatter(GenericDataFormatter):
     ('fab_autoenc_6', DataTypes.REAL_VALUED, InputTypes.OBSERVED_INPUT), 
     ('fall_age', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
     ('fall_female', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
-    ('fall_kreaNormRangeMin', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
-    ('fall_kreaNormRangeMax', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
+    #('fall_kreaNormRangeMin', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
+    #('fall_kreaNormRangeMax', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
     ('icd', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ('icd_17_9x', DataTypes.CATEGORICAL, InputTypes.TARGET),
     ('dow', DataTypes.CATEGORICAL, InputTypes.KNOWN_INPUT),
@@ -230,7 +230,7 @@ class KidfailFormatter(GenericDataFormatter):
       df: Data to use to calibrate scalers.
     """
     print('Setting scalers with training data...')
-    # %%
+    
     #from util.general_util import dev_pickle
     #dev_pickle((self, df),"set_scalers")
     #(self, df) = dev_pickle(False,"set_scalers")
@@ -253,13 +253,14 @@ class KidfailFormatter(GenericDataFormatter):
 
     data = df[real_inputs].values
     self._real_scalers = sklearn.preprocessing.StandardScaler().fit(data)
-    self._target_scaler = sklearn.preprocessing.StandardScaler().fit(
-        df[[target_column]].values)  # used for predictions
-
+    #self._target_scaler = sklearn.preprocessing.StandardScaler().fit(
+    #    df[[target_column]].values)  # used for predictions
+    
     # Format categorical scalers
     categorical_inputs = utils.extract_cols_from_data_type(
         DataTypes.CATEGORICAL, column_definitions,
         {InputTypes.ID, InputTypes.TIME})
+    
 
     categorical_scalers = {}
     num_classes = []
@@ -289,6 +290,8 @@ class KidfailFormatter(GenericDataFormatter):
 
     """
     # %%
+    #from tft_tf2.util.general_util import dev_pickle
+    #dev_pickle((self, df,name),"transform_inputs")
     #from util.general_util import dev_pickle
     #dev_pickle((self, df),"transform_inputs")
     #(self, df,name) = dev_pickle(False,"transform_inputs")
@@ -303,6 +306,8 @@ class KidfailFormatter(GenericDataFormatter):
     real_inputs = utils.extract_cols_from_data_type(
         DataTypes.REAL_VALUED, column_definitions,
         {InputTypes.ID, InputTypes.TIME})
+    
+    
     categorical_inputs = utils.extract_cols_from_data_type(
         DataTypes.CATEGORICAL, column_definitions,
         {InputTypes.ID, InputTypes.TIME})
@@ -325,16 +330,16 @@ class KidfailFormatter(GenericDataFormatter):
           assert code_of_other!=-1
         except:
           print("other code was -1 ", col)
-          from util.general_util import dev_pickle
+          from tft_tf2.util.general_util import dev_pickle
           dev_pickle((self, df,name),"transform_inputs")
         output[col] = output[col].replace(-1,code_of_other)
     
-    # %%
+    
     for col in categorical_inputs:  
       assert 0==(output[col]==-1).sum()
           
       assert 0==output[col].isna().sum()
-    # %%
+    
     for col in categorical_inputs:  
       try:
         #print(col,(output[col]==-1).sum())
@@ -347,9 +352,13 @@ class KidfailFormatter(GenericDataFormatter):
         assert 0==(output[col]==-1).sum()
         
         assert 0==output[col].isna().sum()
-    # %% 
+     
     output = output.fillna(0)
     
+    output['icd_17_9x'] = output['icd_17_9x'].replace(4,-1)
+    
+    #pd.unique(output['icd_17_9x'])
+    # %%
     return output
 
   def format_predictions(self, predictions):
@@ -367,7 +376,8 @@ class KidfailFormatter(GenericDataFormatter):
 
     for col in column_names:
       if col not in {'forecast_time', 'identifier'}:
-        output[col] = self._target_scaler.inverse_transform(predictions[col].values.reshape(-1, 1))
+        #output[col] = self._target_scaler.inverse_transform(predictions[col].values.reshape(-1, 1))
+        output[col] = predictions[col].values.reshape(-1, 1)
 
     return output
 
