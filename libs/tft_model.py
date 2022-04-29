@@ -54,7 +54,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-# %%
+
 #policy = tf.keras.mixed_precision.Policy('mixed_float16')
 policy = tf.keras.mixed_precision.Policy('float32')
 tf.keras.mixed_precision.set_global_policy(policy)
@@ -1265,7 +1265,7 @@ class TemporalFusionTransformer(object):
             # if the validation_loss has not changed for patience Epochs
             tf.keras.callbacks.ReduceLROnPlateau(
                 monitor='val_loss',
-                factor=0.8,
+                factor=0.5,
                 patience=2,
                 verbose=1,
                 mode='auto',
@@ -1305,12 +1305,21 @@ class TemporalFusionTransformer(object):
         
         # %%
         # set the sample weight according to label occurence in training data
+        # %%
         possible_labels, counts = np.unique(labels,return_counts=True)
         sample_weights = 1-(counts/counts.sum())
+        #possible_labels
+        # %%
         for l,w in zip(possible_labels,sample_weights):
-            active_flags[np.squeeze(labels)==l] = w
-            val_flags[np.squeeze(val_labels)==l] = w
-   
+            if l==0:
+                fill = w
+            else:
+                fill = l
+            active_flags[np.squeeze(labels)==l] = fill
+            val_flags[np.squeeze(val_labels)==l] = fill
+        
+        active_flags/np.max(active_flags)
+        val_flags/np.max(val_flags)
         # %%
         print('done unpacking')
         # %%
@@ -1318,7 +1327,7 @@ class TemporalFusionTransformer(object):
         #from tft_tf2.util.general_util import dev_pickle
         #dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection")
         #(data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
-        # %%
+         
         """
         np.unique(val_labels)
         
