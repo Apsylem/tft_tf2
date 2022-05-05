@@ -188,6 +188,8 @@ class KidfailFormatter(GenericDataFormatter):
     train = pd.read_csv(self.train_csv_path, index_col=0)
     valid = pd.read_csv(self.valid_csv_path, index_col=0)
     test = pd.read_csv(self.test_csv_path, index_col=0)
+
+    # %%
     
     self.set_scalers(train)
     return (self.transform_inputs(data,name) for data,name in zip([train, valid, test],["train", "valid", "test"]))
@@ -302,7 +304,7 @@ class KidfailFormatter(GenericDataFormatter):
       raise ValueError('Scalers have not been set!')
 
     column_definitions = self.get_column_definition()
-
+    
     real_inputs = utils.extract_cols_from_data_type(
         DataTypes.REAL_VALUED, column_definitions,
         {InputTypes.ID, InputTypes.TIME})
@@ -311,7 +313,10 @@ class KidfailFormatter(GenericDataFormatter):
     categorical_inputs = utils.extract_cols_from_data_type(
         DataTypes.CATEGORICAL, column_definitions,
         {InputTypes.ID, InputTypes.TIME})
-
+    # %%
+    real_inputs
+    categorical_inputs
+    # %%
     # Format real inputs
     output[real_inputs] = self._real_scalers.transform(df[real_inputs].values)
 
@@ -355,8 +360,8 @@ class KidfailFormatter(GenericDataFormatter):
      
     output = output.fillna(0)
     
-    output['icd_17_9x'] = output['icd_17_9x'].replace(4,-1)
-    
+    # category 4 gets assigned to missing values, so we need to remove them by imputing 0
+    output['icd_17_9x'] = output['icd_17_9x'].replace(4,0)
     #pd.unique(output['icd_17_9x'])
     # %%
     return output
@@ -390,7 +395,7 @@ class KidfailFormatter(GenericDataFormatter):
         'num_encoder_steps': self.num_encoder_steps,
         'n_timesteps_forecasting':self.n_timesteps_forecasting,
         'num_epochs': self.num_epochs,
-        'early_stopping_patience': 5,
+        'early_stopping_patience': 8,
         'multiprocessing_workers': 5,
     }
     
