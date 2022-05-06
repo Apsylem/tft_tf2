@@ -452,7 +452,9 @@ class TemporalFusionTransformer(object):
         self.name = self.__class__.__name__
 
         params = dict(raw_params)  # copy locally
-
+        
+        self.modeling_type = params['modeling_type']
+        
         # Data parameters
         self.time_steps = int(params['total_time_steps'])
         self.n_timesteps_forecasting = int(params['n_timesteps_forecasting'])
@@ -473,7 +475,8 @@ class TemporalFusionTransformer(object):
         self.column_definition = params['column_definition']
 
         # Network params
-        self.quantiles = [0.1, 0.5, 0.9]
+        if self.modeling_type=='regression':
+            self.quantiles = [0.1, 0.5, 0.9]
         #self.use_cudnn = use_cudnn  # Whether to use GPU optimised LSTM
         self.hidden_layer_size = int(params['hidden_layer_size'])
         self.dropout_rate = float(params['dropout_rate'])
@@ -489,6 +492,9 @@ class TemporalFusionTransformer(object):
         
         
         self._temp_folder = os.path.join(params['model_folder'], 'tmp')
+        
+        
+        
         # Serialisation options
         if not for_prediction:
             
@@ -1185,10 +1191,19 @@ class TemporalFusionTransformer(object):
 
             transformer_layer, all_inputs, attention_components \
                 = self._build_base_graph()
-            
-            outputs = tf.keras.layers.TimeDistributed(
+            if self.modeling_type=='regression':
+                outputs = tf.keras.layers.TimeDistributed(
                 tf.keras.layers.Dense(self.output_size * len(self.quantiles))) \
-                (transformer_layer[Ellipsis, self.num_encoder_steps:, :])
+                    (transformer_layer[Ellipsis, self.num_encoder_steps:, :])
+                
+            if self.modeling_type=='binary_classification':
+                from tensorflow_probability import layers as tfpl
+                from tensorflow_probability import distributions as tfpd
+                prob_input = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(self.output_size))\
+                    (transformer_layer[Ellipsis, self.num_encoder_steps:, :])
+                outputs = tfpl.IndependentBernoulli(self.output_size)(prob_input)
+                
+            
 
             self._attention_components = attention_components
 
@@ -1198,47 +1213,50 @@ class TemporalFusionTransformer(object):
             model = tf.keras.Model(inputs=all_inputs, outputs=outputs)
 
           
+            if self.modeling_type=='regression':
+                valid_quantiles = self.quantiles
+                output_size = self.output_size
 
-            valid_quantiles = self.quantiles
-            output_size = self.output_size
+                class QuantileLossCalculator(object):
+                    """Computes the combined quantile loss for prespecified quantiles.
 
-            class QuantileLossCalculator(object):
-                """Computes the combined quantile loss for prespecified quantiles.
-
-                Attributes:
-                  quantiles: Quantiles to compute losses
-                """
-
-                def __init__(self, quantiles):
-                    """Initializes computer with quantiles for loss calculations.
-
-                    Args:
-                      quantiles: Quantiles to use for computations.
+                    Attributes:
+                    quantiles: Quantiles to compute losses
                     """
-                    self.quantiles = quantiles
 
-                def quantile_loss(self, a, b):
-                    """Returns quantile loss for specified quantiles.
+                    def __init__(self, quantiles):
+                        """Initializes computer with quantiles for loss calculations.
 
-                    Args:
-                      a: Targets
-                      b: Predictions
-                    """
-                    quantiles_used = set(self.quantiles)
+                        Args:
+                        quantiles: Quantiles to use for computations.
+                        """
+                        self.quantiles = quantiles
 
-                    loss = 0.
-                    for i, quantile in enumerate(valid_quantiles):
-                        if quantile in quantiles_used:
-                            loss += utils.tensorflow_quantile_loss(
-                                a[Ellipsis, output_size * i:output_size * (i + 1)],
-                                b[Ellipsis, output_size * i:output_size * (i + 1)], quantile)
-                    return loss
+                    def quantile_loss(self, a, b):
+                        """Returns quantile loss for specified quantiles.
 
-            quantile_loss = QuantileLossCalculator(valid_quantiles).quantile_loss
+                        Args:
+                        a: Targets
+                        b: Predictions
+                        """
+                        quantiles_used = set(self.quantiles)
+
+                        loss = 0.
+                        for i, quantile in enumerate(valid_quantiles):
+                            if quantile in quantiles_used:
+                                loss += utils.tensorflow_quantile_loss(
+                                    a[Ellipsis, output_size * i:output_size * (i + 1)],
+                                    b[Ellipsis, output_size * i:output_size * (i + 1)], quantile)
+                        return loss
+                loss = QuantileLossCalculator(valid_quantiles).quantile_loss
+            if self.modeling_type=='binary_classification':
+                def negative_loglikelihood(targets, estimated_distribution):
+                    return -estimated_distribution.log_prob(targets)
+                loss = negative_loglikelihood
 
             model.compile(
-                loss=quantile_loss, optimizer=adam, sample_weight_mode='temporal')
-
+                loss=loss, optimizer=adam, sample_weight_mode='temporal')	
+            print("model.summary()",model.summary())
             self._input_placeholder = all_inputs
 
         return model
@@ -1310,27 +1328,40 @@ class TemporalFusionTransformer(object):
         sample_weights = 1-(counts/counts.sum())
         #possible_labels
         # %%
-        for l,w in zip(possible_labels,sample_weights):
+        """for l,w in zip(possible_labels,sample_weights):
             if l==0:
                 fill = w
             else:
                 fill = l
             active_flags[np.squeeze(labels)==l] = fill
             val_flags[np.squeeze(val_labels)==l] = fill
+        # %%
+        active_flags = active_flags/np.max(active_flags)
+        val_flags = val_flags/np.max(val_flags)"""
+        # %%
         
-        active_flags/np.max(active_flags)
-        val_flags/np.max(val_flags)
+        for l,w in zip(possible_labels,sample_weights):
+            active_flags[np.squeeze(labels)==l] = w
+            val_flags[np.squeeze(val_labels)==l] = w
+        
+        
         # %%
         print('done unpacking')
         # %%
         
         #from tft_tf2.util.general_util import dev_pickle
-        #dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection")
+        #dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection", False)
         #(data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
-         
-        """
-        np.unique(val_labels)
+        # %% 
         
+        np.unique(val_labels)
+        # %%
+        np.unique(labels)
+        # %%
+        np.unique(active_flags)
+        # %%
+        np.unique(val_flags)
+        """
         # %%
         val_data.max(axis=(0,1))
         np.unique(val_data[:,10,61])
@@ -1429,13 +1460,17 @@ class TemporalFusionTransformer(object):
         time = data['time']
         identifier = data['identifier']
         outputs = data['outputs']
-
-        combined = self.model.predict(
-            inputs,
-            workers=16,
-            use_multiprocessing=True,
-            batch_size=self.minibatch_size)
-
+        if self.modeling_type=='regression':
+            combined = self.model.predict(
+                inputs,
+                workers=16,
+                use_multiprocessing=True,
+                batch_size=self.minibatch_size)
+        else:
+            
+            combined = self.model(
+                inputs)
+        print("combined",combined)
         # Format output_csv
         if self.output_size != 1:
             raise NotImplementedError('Current version only supports 1D targets!')
@@ -1457,11 +1492,17 @@ class TemporalFusionTransformer(object):
             return flat_prediction[['forecast_time', 'identifier'] + cols]
 
         # Extract predictions for each quantile into different entries
-        process_map = {
-            'p{}'.format(int(q * 100)):
-                combined[Ellipsis, i * self.output_size:(i + 1) * self.output_size]
-            for i, q in enumerate(self.quantiles)
-        }
+        if self.modeling_type=='regression':
+            process_map = {
+                'p{}'.format(int(q * 100)):
+                    combined[Ellipsis, i * self.output_size:(i + 1) * self.output_size]
+                for i, q in enumerate(self.quantiles)
+            }
+        else:
+            process_map = {
+            'mean': combined.mean().eval()    ,
+            'mode': combined.mode().eval()    
+            }
 
         if return_targets:
             # Add targets if relevant
