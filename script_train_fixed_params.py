@@ -79,7 +79,8 @@ def main(expt_name,
          model_folder,
          data_csv_path,
          data_formatter,
-         use_testing_mode=False):
+         use_testing_mode=False,
+         modeling_type = 'regression'):
     """Trains tft based on defined model params.
 
     Args:
@@ -144,6 +145,7 @@ def main(expt_name,
     fixed_params = data_formatter.get_experiment_params()
     params = data_formatter.get_default_model_params()
     params["model_folder"] = model_folder
+    params['modeling_type'] = modeling_type
     
     if not os.path.isdir(model_folder):
         os.makedirs(model_folder)
@@ -217,7 +219,7 @@ def main(expt_name,
         val_loss = model.evaluate(valid)
 
         print("Computing test loss")
-        output_map = model.predict(test, return_targets=True)
+        output_map = model.predict(test, return_targets=True, sess=sess)
         targets = data_formatter.format_predictions(output_map["targets"])
         p50_forecast = data_formatter.format_predictions(output_map["p50"])
         p90_forecast = data_formatter.format_predictions(output_map["p90"])
@@ -228,13 +230,13 @@ def main(expt_name,
                 col for col in data.columns
                 if col not in {"forecast_time", "identifier"}
             ]]
-
-        p50_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p50_forecast),
-            0.5)
-        p90_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p90_forecast),
-            0.9)
+        if modeling_type=='regression':
+            p50_loss = utils.numpy_normalised_quantile_loss(
+                extract_numerical_data(targets), extract_numerical_data(p50_forecast),
+                0.5)
+            p90_loss = utils.numpy_normalised_quantile_loss(
+                extract_numerical_data(targets), extract_numerical_data(p90_forecast),
+                0.9)
 
         tf.keras.backend.set_session(default_keras_session)
 
@@ -244,9 +246,10 @@ def main(expt_name,
 
     for k in best_params:
         print(k, " = ", best_params[k])
-    print()
-    print("Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
-        p50_loss.mean(), p90_loss.mean()))
+        
+    if modeling_type=='regression':
+        print("Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
+            p50_loss.mean(), p90_loss.mean()))
     
     print(f"took {time_to_fit} seconds for {params['num_epochs']} epochs to fit with gpu {use_gpu}")
 
@@ -362,6 +365,8 @@ if __name__ == "__main__":
         data_csv_path=config.data_csv_path,
         data_formatter=formatter,
         use_testing_mode=use_testing_mode,
+        modeling_type='binary_classification',
+        #modeling_type='regression',
         )  # Change to false to use original default params
     # %%
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 6 -input_t_dim 120 -num_epochs 1
