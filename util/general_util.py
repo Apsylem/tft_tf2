@@ -111,7 +111,7 @@ def in_notebook():
     return True
 
 def dev_pickle(to_pickle,function_name,abort = True):
-    dev_pkl_path = os.path.join('data/dev_pickles',function_name+'.pkl')
+    dev_pkl_path = os.path.join('/home/alexander/kidfail/data/dev_pickles',function_name+'.pkl')
     if not os.path.exists(dev_pkl_path):
         if not isinstance(to_pickle,bool):
             pickle.dump(to_pickle, open(dev_pkl_path,'wb'),protocol=4)
