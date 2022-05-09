@@ -1354,13 +1354,13 @@ class TemporalFusionTransformer(object):
         #(data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
         # %% 
         
-        np.unique(val_labels)
+        #np.unique(val_labels)
         # %%
-        np.unique(labels)
+        #np.unique(labels)
         # %%
-        np.unique(active_flags)
+        #np.unique(active_flags)
         # %%
-        np.unique(val_flags)
+        #np.unique(val_flags)
         """
         # %%
         val_data.max(axis=(0,1))
@@ -1382,9 +1382,14 @@ class TemporalFusionTransformer(object):
         #(labels==np.nan).sum()
         #active_flags
         #np.unique(labels)
-        y_concat = np.concatenate([labels, labels, labels], axis=-1)
-        val_concat =  np.concatenate([val_labels, val_labels, val_labels],
-                                            axis=-1)
+        print("self.model.summary()",self.model.summary())
+        if self.modeling_type=='regression':
+            y_concat = np.concatenate([labels, labels, labels], axis=-1)
+            val_concat =  np.concatenate([val_labels, val_labels, val_labels],
+                                                axis=-1)
+        else:
+            y_concat = labels
+            val_concat =  val_labels
         # %%
         all_callbacks = callbacks
         self.model.fit(
@@ -1430,10 +1435,14 @@ class TemporalFusionTransformer(object):
         inputs = raw_data['inputs']
         outputs = raw_data['outputs']
         active_entries = self._get_active_locations(raw_data['active_entries'])
-
+        
+        if self.modeling_type=='regression':
+            y_concat = np.concatenate([outputs, outputs, outputs], axis=-1)
+        else:
+            y_concat = outputs
         metric_values = self.model.evaluate(
             x=inputs,
-            y=np.concatenate([outputs, outputs, outputs], axis=-1),
+            y=y_concat,
             sample_weight=active_entries,
             workers=16,
             use_multiprocessing=True)
@@ -1442,7 +1451,7 @@ class TemporalFusionTransformer(object):
 
         return metrics[eval_metric]
 
-    def predict(self, df, return_targets=False):
+    def predict(self, df, return_targets=False,sess=None):
         """Computes predictions for a given input dataset.
 
         Args:
@@ -1453,9 +1462,11 @@ class TemporalFusionTransformer(object):
         Returns:
           Input dataframe or tuple of (input dataframe, algined output dataframe).
         """
-
+        
         data = self._batch_data(df)
-
+        #from util.general_util import dev_pickle
+        #dev_pickle((data),"data_from_predict", False)
+        #(data) = dev_pickle(False,"data_from_predict")
         inputs = data['inputs']
         time = data['time']
         identifier = data['identifier']
@@ -1467,10 +1478,35 @@ class TemporalFusionTransformer(object):
                 use_multiprocessing=True,
                 batch_size=self.minibatch_size)
         else:
+            mean_list = []
+            mode_list = []
             
-            combined = self.model(
-                inputs)
-        print("combined",combined)
+            n_batches = inputs.shape[0]//self.minibatch_size
+            n_batches_range = range(n_batches)
+            
+            for batch in n_batches_range:
+                if not batch==(n_batches-1):
+                    begin = batch*self.minibatch_size
+                    end = begin + self.minibatch_size
+                    sel = inputs[begin:end]
+                else:
+                    begin = batch*self.minibatch_size
+                    sel = inputs[begin:]
+               
+                mean_list.append(self.model.outputs[0].mean().eval(feed_dict={self.model.inputs[0]:sel}))
+                mode_list.append(self.model.outputs[0].mode().eval(feed_dict={self.model.inputs[0]:sel}))
+            process_map = {
+            'mean': np.concatenate(mean_list, axis=0),
+            'mode': np.concatenate(mode_list, axis=0)   
+            }
+            assert inputs.shape[0]==process_map['mean'].shape[0]
+        #template = self.model.outputs[0].mean().eval(feed_dict={self.model.inputs[0]:inputs})
+        # %%
+        #from tft_tf2.util.general_util import dev_pickle
+        #dev_pickle((process_map,template,inputs,self.minibatch_size),"predict_batches",False)
+        #(process_map,template,inputs,minibatch_size) = dev_pickle(False,"predict_batches")
+
+        
         # Format output_csv
         if self.output_size != 1:
             raise NotImplementedError('Current version only supports 1D targets!')
@@ -1498,11 +1534,7 @@ class TemporalFusionTransformer(object):
                     combined[Ellipsis, i * self.output_size:(i + 1) * self.output_size]
                 for i, q in enumerate(self.quantiles)
             }
-        else:
-            process_map = {
-            'mean': combined.mean().eval()    ,
-            'mode': combined.mode().eval()    
-            }
+        
 
         if return_targets:
             # Add targets if relevant
