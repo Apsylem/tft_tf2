@@ -35,14 +35,14 @@ import sys
 pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 #pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 pathProject
-# %%
+
 try:
     os.chdir(pathProject)
 except:
     os.chdir('/app')
     pathProject = '/app'
     
-# %%
+
 sys.path.insert(0,pathProject)
 import argparse
 import datetime as dte
@@ -79,7 +79,8 @@ def main(expt_name,
          model_folder,
          data_csv_path,
          data_formatter,
-         use_testing_mode=False):
+         use_testing_mode=False,
+         modeling_type = 'regression'):
     """Trains tft based on defined model params.
 
     Args:
@@ -98,7 +99,9 @@ def main(expt_name,
     #output_folder = '/app/tft_outputs'
     #config = ExperimentConfig(expt_name, output_folder)
     #formatter = config.make_data_formatter()
-
+    #from util.general_util import dev_pickle
+    #dev_pickle((expt_name,use_gpu,model_folder,data_csv_path,data_formatter,use_testing_mode,modeling_type),"main")
+    #(expt_name,use_gpu,model_folder,data_csv_path,data_formatter,use_testing_mode,modeling_type) = dev_pickle(False,"main")
     
    
     #use_gpu=False
@@ -144,6 +147,7 @@ def main(expt_name,
     fixed_params = data_formatter.get_experiment_params()
     params = data_formatter.get_default_model_params()
     params["model_folder"] = model_folder
+    params['modeling_type'] = modeling_type
     
     if not os.path.isdir(model_folder):
         os.makedirs(model_folder)
@@ -201,8 +205,72 @@ def main(expt_name,
                 best_loss = val_loss
 
             tf.keras.backend.set_session(default_keras_session)
-    # %% 
+    """# %% 
+    model.model
+    # %%
+    from util.general_util import dev_pickle
+    #dev_pickle((data),"data_from_predict", False)
+    (data) = dev_pickle(False,"data_from_predict")
+    data['inputs'].shape
+    # %%
+    #tf.reset_default_graph()
+    g = tf.Graph()
+    sess = tf.Session(graph = tf.Graph(),config=tf_config) 
+    #with tf.Session(graph=g,config=tf_config).as_default() as sess:
+    tf.keras.backend.set_session(sess)
+    with g.as_default():
     
+    #tf.keras.backend.set_session(sess)
+        
+            #tf.compat.v1.disable_eager_execution()
+        best_params = opt_manager.get_best_params()
+        model = ModelClass(best_params, use_cudnn=use_gpu)
+            
+        model.load(opt_manager.hyperparam_folder)
+        tf.keras.backend.set_session(sess)
+    # %%
+    #with g.as_default(), tf.Session(config=tf_config) as sess:
+    #with tf.Session(config=tf_config) as sess:
+    #with tf.Session(graph=g,config=tf_config).as_default() as sess:
+    with g.as_default():
+        tf.keras.backend.set_session(sess)
+        #tf.compat.v1.disable_eager_execution()
+        #model.model(data['inputs']).mean()
+        
+        model.model.outputs[0].mean().eval(session = sess,feed_dict={model.model.inputs[0]:data['inputs']})
+        tf.keras.backend.set_session(sess)
+    # %%
+    with g.as_default():
+        sess.run(model.model.outputs[0].mean(), feed_dict = {model.model.inputs[0]:data['inputs']})
+    # %%
+    tf.reset_default_graph()
+    with tf.Graph().as_default(), tf.Session(config=tf_config) as sess:
+        tf.keras.backend.set_session(sess)
+        best_params = opt_manager.get_best_params()
+        model = ModelClass(best_params, use_cudnn=use_gpu)
+        
+        model.load(opt_manager.hyperparam_folder)
+        
+        combined = model.model(data['inputs'])
+        #X = tf.placeholder(tf.float32, [None, data['inputs'].shape[1],data['inputs'].shape[2]])
+        #X = tf.placeholder(tf.float32, [None, 40,1])
+        print("combined.mean()",combined.mean())
+        print("combined.mean()",dir(combined.mean()))
+  
+        #mean = combined.mean().eval(session=sess,feed_dict={model.model.inputs[0]:data['inputs']})
+        mean = model.model.outputs[0].mean().eval(feed_dict={model.model.inputs[0]:data['inputs']})
+        print(type(mean))
+        print("mean",mean)
+        
+    # %%
+    X = tf.compat.v1.placeholder(tf.float32, [None, time_steps,combined_input_size])
+    
+    process_map = {
+    'mean': combined.mean().eval(session=sess,feed_dict={X:inputs})    ,
+    'mode': combined.mode().eval(session=sess,feed_dict={X:inputs})    
+    }
+    # %%
+    """
     print("*** Running tests ***")
     tf.reset_default_graph()
     with tf.Graph().as_default(), tf.Session(config=tf_config) as sess:
@@ -217,10 +285,16 @@ def main(expt_name,
         val_loss = model.evaluate(valid)
 
         print("Computing test loss")
-        output_map = model.predict(test, return_targets=True)
+        output_map = model.predict(test, return_targets=True, sess=sess)
         targets = data_formatter.format_predictions(output_map["targets"])
-        p50_forecast = data_formatter.format_predictions(output_map["p50"])
-        p90_forecast = data_formatter.format_predictions(output_map["p90"])
+        # %%
+        #from util.general_util import dev_pickle
+        #dev_pickle((targets,output_map,data_formatter),"formatting")
+        #(targets,output_map,data_formatter) = dev_pickle(False,"formatting")
+        
+        if modeling_type=='regression':
+            p50_forecast = data_formatter.format_predictions(output_map["p50"])
+            p90_forecast = data_formatter.format_predictions(output_map["p90"])
 
         def extract_numerical_data(data):
             #Strips out forecast time and identifier columns.
@@ -228,13 +302,13 @@ def main(expt_name,
                 col for col in data.columns
                 if col not in {"forecast_time", "identifier"}
             ]]
-
-        p50_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p50_forecast),
-            0.5)
-        p90_loss = utils.numpy_normalised_quantile_loss(
-            extract_numerical_data(targets), extract_numerical_data(p90_forecast),
-            0.9)
+        if modeling_type=='regression':
+            p50_loss = utils.numpy_normalised_quantile_loss(
+                extract_numerical_data(targets), extract_numerical_data(p50_forecast),
+                0.5)
+            p90_loss = utils.numpy_normalised_quantile_loss(
+                extract_numerical_data(targets), extract_numerical_data(p90_forecast),
+                0.9)
 
         tf.keras.backend.set_session(default_keras_session)
 
@@ -244,9 +318,10 @@ def main(expt_name,
 
     for k in best_params:
         print(k, " = ", best_params[k])
-    print()
-    print("Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
-        p50_loss.mean(), p90_loss.mean()))
+        
+    if modeling_type=='regression':
+        print("Normalised Quantile Loss for Test Data: P50={}, P90={}".format(
+            p50_loss.mean(), p90_loss.mean()))
     
     print(f"took {time_to_fit} seconds for {params['num_epochs']} epochs to fit with gpu {use_gpu}")
 
@@ -358,10 +433,12 @@ if __name__ == "__main__":
     main(
         expt_name=name,
         use_gpu=use_tensorflow_with_gpu,
-        model_folder=os.path.join(config.model_folder,f"fixed_{use_testing_mode}_itd_{input_t_dim}_nes_{num_encoder_steps}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}_lr_{lr}"),
+        model_folder=os.path.join(config.model_folder,f"binary_{use_testing_mode}_itd_{input_t_dim}_nes_{num_encoder_steps}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}_lr_{lr}_32"),
         data_csv_path=config.data_csv_path,
         data_formatter=formatter,
         use_testing_mode=use_testing_mode,
+        modeling_type='binary_classification',
+        #modeling_type='regression',
         )  # Change to false to use original default params
     # %%
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 6 -input_t_dim 120 -num_epochs 1
@@ -374,6 +451,7 @@ if __name__ == "__main__":
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 20 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.001
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 1 -timeseries_interval 48 -input_t_dim 60 -num_epochs 1000 -lr 0.001
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 20 -n_timesteps_forecasting 4 -timeseries_interval 6 -input_t_dim 60 -num_epochs 1000 -lr 0.001
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 60 -n_timesteps_forecasting 8 -timeseries_interval 6 -input_t_dim 60 -num_epochs 1000 -lr 0.001
 #took 106.69269490242004 seconds for 1 epochs to fit with gpu True
 #took 100.74724411964417 seconds for 1 epochs to fit with gpu False
 

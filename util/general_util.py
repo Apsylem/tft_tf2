@@ -119,6 +119,7 @@ def dev_pickle(to_pickle,function_name,abort = True):
         else:
             print("somethinhg is to be pickled, that ought not to be. Ima right stop u here")
             print(f'{function_name}')
+            print(dev_pkl_path)
         if abort:
             import sys
             sys.exit()
