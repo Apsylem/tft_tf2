@@ -636,9 +636,13 @@ class TemporalFusionTransformer(object):
 
     def _get_single_col_by_type(self, input_type):
         """Returns name of single column for input type."""
-
+     
+        
         return utils.get_single_col_by_input_type(input_type,
-                                                  self.column_definition)
+                                                  self.column_definition,
+                                                  skip_assert_single_col=(
+                                                      (self.modeling_type=='multiclass_classification')&(input_type==InputTypes.TARGET))
+                                                  )
 
     def training_data_cached(self):
         """Returns boolean indicating if training data has been cached."""
@@ -762,9 +766,9 @@ class TemporalFusionTransformer(object):
           Batched Numpy array with shape=(?, self.time_steps, self.input_size)
         """
         # %%
-        
-        #dev_pickle((self, data),"_batch_data")
-        #(self, data) = dev_pickle(False,"_batch_data")
+        #from util.general_util import dev_pickle
+        #dev_pickle((data),"_batch_data", False)
+        #(data) = dev_pickle(False,"_batch_data")
         # %%
         #class A():
         #    def init():
@@ -774,7 +778,7 @@ class TemporalFusionTransformer(object):
         #(data,self.time_steps,id_col,time_col,target_col,self.column_definition,self.num_encoder_steps,self.n_timesteps_forecasting) = dev_pickle(False,"_batch_data")
         #self.time_steps = 40+40
         #self.num_encoder_steps = 40
-        
+        # %%
         # Functions.
         def _batch_single_entity(input_data):
             
@@ -793,8 +797,7 @@ class TemporalFusionTransformer(object):
         target_col = self._get_single_col_by_type(InputTypes.TARGET)
         #from util.general_util import dev_pickle
         #dev_pickle((data,self.time_steps,id_col,time_col,target_col,self.column_definition,self.num_encoder_steps,self.n_timesteps_forecasting),"_batch_data")
-       
-        # %%
+        
         input_cols = [
             tup[0]
             for tup in self.column_definition
@@ -806,6 +809,7 @@ class TemporalFusionTransformer(object):
         # timeseries length can be calculated by deviding the length of the id column with the amount of unique ids
         # this is due to the fact, that every case contains the exact same amount of timesteps
         timeseries_length = int(data[id_col].shape[0]/sample_size)
+        
         data = data.sort_values([id_col,time_col])
         # %%
         """
@@ -845,7 +849,13 @@ class TemporalFusionTransformer(object):
                 'outputs': [target_col],
                 'inputs': input_cols
             }
-        
+        # %%
+        # de list again if multiple colums are expected
+        if self.modeling_type=='multiclass_classification':
+            # %%
+            col_mappings['outputs'] = col_mappings['outputs'][0]
+            # %%
+        # %%
         # iterate over col mappings
         for k, cols in col_mappings.items():
             
@@ -892,19 +902,24 @@ class TemporalFusionTransformer(object):
         #assert ( np.nan_to_num(data_map['inputs'])== np.nan_to_num(data_map_test['inputs'])).min()
       
         
-        # %%
+        
         # Shorten target so we only get decoder steps
         data_map['outputs'] = data_map['outputs'][:, self.num_encoder_steps:, :]
-        # %%
         
-        # %%
-        #FIXME only for testing porpuses, the remaining Target Data in X, will be set to -1
+        #to assure, no data transmission the remaining Target Data in X, will be set to -1
         # as i understood the time fusuion transformer, this target value should not be transmitted to the model, allthoough it is given to the model via input
         data_map['inputs'][:,-1,col_mappings['inputs'].index(col_mappings['outputs'][0])] = -1
-        # %%
+        
         #np.unique(data_map['inputs'][:,:,col_mappings['inputs'].index(col_mappings['outputs'][0])])
-        # %%
+        
         active_entries = np.ones_like(data_map['outputs'])
+        # %%
+        # aggregate the data to match timeseries dimensionality, when multiple targets
+        #if self.modeling_type=='multiclass_classification':
+            # %%
+            #active_entries = np.max(active_entries,axis=2)
+            # %%
+        #    
         if 'active_entries' not in data_map:
             data_map['active_entries'] = active_entries
         else:
@@ -1203,6 +1218,13 @@ class TemporalFusionTransformer(object):
                     (transformer_layer[Ellipsis, self.num_encoder_steps:, :])
                 outputs = tfpl.IndependentBernoulli(self.output_size)(prob_input)
                 
+            if self.modeling_type=='multiclass_classification':
+                from tensorflow_probability import layers as tfpl
+                from tensorflow_probability import distributions as tfpd
+                prob_input = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(tfpl.OneHotCategorical.params_size(self.output_size)))\
+                    (transformer_layer[Ellipsis, self.num_encoder_steps:, :])
+                outputs = tfpl.OneHotCategorical(self.output_size)(prob_input)
+                
             
 
             self._attention_components = attention_components
@@ -1249,7 +1271,7 @@ class TemporalFusionTransformer(object):
                                     b[Ellipsis, output_size * i:output_size * (i + 1)], quantile)
                         return loss
                 loss = QuantileLossCalculator(valid_quantiles).quantile_loss
-            if self.modeling_type=='binary_classification':
+            if (self.modeling_type=='binary_classification' or self.modeling_type=='multiclass_classification'):
                 def negative_loglikelihood(targets, estimated_distribution):
                     return -estimated_distribution.log_prob(targets)
                 loss = negative_loglikelihood
@@ -1320,7 +1342,10 @@ class TemporalFusionTransformer(object):
         # Unpack without sample weights
         data, labels, active_flags = _unpack(train_data)
         val_data, val_labels, val_flags = _unpack(valid_data)
-        
+        # %%
+        from tft_tf2.util.general_util import dev_pickle
+        dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection", False)
+        (data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
         # %%
         # set the sample weight according to label occurence in training data
         # %%
@@ -1339,19 +1364,28 @@ class TemporalFusionTransformer(object):
         active_flags = active_flags/np.max(active_flags)
         val_flags = val_flags/np.max(val_flags)"""
         # %%
-        
+        if self.modeling_type == 'multiclass_classification':
+            # %%
+            flag_pointer = np.max(labels, axis=2)
+            val_flag_pointer = np.max(val_labels, axis=2)
+            # %%
+        else:
+            flag_pointer = labels
+            val_flag_pointer = val_labels
+        # %%
+        flag_pointer.shape
+        active_flags.shape
+        # %%
         for l,w in zip(possible_labels,sample_weights):
-            active_flags[np.squeeze(labels)==l] = w
-            val_flags[np.squeeze(val_labels)==l] = w
-        
+            active_flags[np.squeeze(flag_pointer)==l] = w
+            val_flags[np.squeeze(val_flag_pointer)==l] = w
+        # %%
         
         # %%
         print('done unpacking')
         # %%
         
-        #from tft_tf2.util.general_util import dev_pickle
-        #dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection", False)
-        #(data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
+        
         # %% 
         
         #np.unique(val_labels)
@@ -1500,16 +1534,19 @@ class TemporalFusionTransformer(object):
             'mode': np.concatenate(mode_list, axis=0)   
             }
             assert inputs.shape[0]==process_map['mean'].shape[0]
+        
         #template = self.model.outputs[0].mean().eval(feed_dict={self.model.inputs[0]:inputs})
         # %%
         #from tft_tf2.util.general_util import dev_pickle
-        #dev_pickle((process_map,template,inputs,self.minibatch_size),"predict_batches",False)
-        #(process_map,template,inputs,minibatch_size) = dev_pickle(False,"predict_batches")
-
+        #dev_pickle((process_map,inputs,self.minibatch_size),"predict_batches",False)
+        #(process_map,inputs,minibatch_size) = dev_pickle(False,"predict_batches")
+        # %%
+        process_map['mean'].shape
+        # %%
         
         # Format output_csv
-        if self.output_size != 1:
-            raise NotImplementedError('Current version only supports 1D targets!')
+        #if self.output_size != 1:
+        #    raise NotImplementedError('Current version only supports 1D targets!')
 
         def format_outputs(prediction):
             """Returns formatted dataframes for prediction."""
@@ -1539,8 +1576,12 @@ class TemporalFusionTransformer(object):
         if return_targets:
             # Add targets if relevant
             process_map['targets'] = outputs
-
-        return {k: format_outputs(process_map[k]) for k in process_map}
+            
+        target_cols = self._get_single_col_by_type(InputTypes.TARGET)
+        
+        formatted_output = {k: format_outputs(process_map[k]) for k in process_map}
+        formatted_output['target_cols'] = target_cols
+        return formatted_output
 
     def get_attention(self, df):
         """Computes TFT attention weights for a given dataset.

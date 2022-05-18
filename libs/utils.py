@@ -14,31 +14,55 @@
 # limitations under the License.
 
 # Lint as: python3
+# %%
 """Generic helper functions used across codebase."""
 
+
+import sys
 import os
+pathProject = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+pathProject
+
+try:
+    os.chdir(pathProject)
+except:
+    os.chdir('/app/')
+    pathProject = '/app/'
+
+sys.path.append(pathProject)
+
+print("sys.path",sys.path)
 import pathlib
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
 
-
+# %%
 # Generic.
-def get_single_col_by_input_type(input_type, column_definition):
+def get_single_col_by_input_type(input_type, column_definition,skip_assert_single_col=False):
   """Returns name of single column.
 
   Args:
     input_type: Input type of column to extract
     column_definition: Column definition list for experiment
   """
+ 
+  # %%
+  #from util.general_util import dev_pickle
 
+  #(input_type, column_definition,assert_single_col) = dev_pickle(False,"get_single_col_by_input_type")
+  # %%
   l = [tup[0] for tup in column_definition if tup[2] == input_type]
+  # %%
+  if not skip_assert_single_col:
+    if len(l) != 1:
+      #dev_pickle((input_type, column_definition,assert_single_col),"get_single_col_by_input_type")
+      raise ValueError('Invalid number of columns for {}'.format(input_type))
 
-  if len(l) != 1:
-    raise ValueError('Invalid number of columns for {}'.format(input_type))
-
-  return l[0]
+    return l[0]
+  else:
+    return l
 
 
 def extract_cols_from_data_type(data_type, column_definition,

@@ -32,6 +32,8 @@ Command line args:
 # %%
 import os
 import sys
+
+from sklearn import multiclass
 pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 #pathProject = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 pathProject
@@ -286,13 +288,14 @@ def main(expt_name,
 
         print("Computing test loss")
         output_map = model.predict(test, return_targets=True, sess=sess)
-        targets = data_formatter.format_predictions(output_map["targets"])
+        
         # %%
-        #from util.general_util import dev_pickle
-        #dev_pickle((targets,output_map,data_formatter),"formatting")
-        #(targets,output_map,data_formatter) = dev_pickle(False,"formatting")
+        from util.general_util import dev_pickle
+        dev_pickle((output_map,data_formatter),"formatting")
+        (output_map,data_formatter) = dev_pickle(False,"formatting")
         
         if modeling_type=='regression':
+            targets = data_formatter.format_predictions(output_map["targets"])
             p50_forecast = data_formatter.format_predictions(output_map["p50"])
             p90_forecast = data_formatter.format_predictions(output_map["p90"])
 
@@ -427,21 +430,24 @@ if __name__ == "__main__":
                         timeseries_interval = timeseries_interval,
                         input_t_dim = input_t_dim,
                         num_epochs = num_epochs,
-                        lr = lr)
+                        lr = lr,
+                        multiclass=True)
     # Customise inputs to main() for new datasets.
     
     main(
         expt_name=name,
         use_gpu=use_tensorflow_with_gpu,
-        model_folder=os.path.join(config.model_folder,f"binary_{use_testing_mode}_itd_{input_t_dim}_nes_{num_encoder_steps}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}_lr_{lr}_32"),
+        model_folder=os.path.join(config.model_folder,f"multi_{use_testing_mode}_itd_{input_t_dim}_nes_{num_encoder_steps}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}_lr_{lr}_32"),
         data_csv_path=config.data_csv_path,
         data_formatter=formatter,
         use_testing_mode=use_testing_mode,
-        modeling_type='binary_classification',
+        #modeling_type='binary_classification',
+        modeling_type='multiclass_classification',
         #modeling_type='regression',
         )  # Change to false to use original default params
     # %%
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein yes -num_encoder_steps 56 -n_timesteps_forecasting 20 -timeseries_interval 6 -input_t_dim 120 -num_epochs 1
+#python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein yes -num_encoder_steps 60 -n_timesteps_forecasting 40 -timeseries_interval 6 -input_t_dim 60 -num_epochs 1
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 56 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.00001
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 20 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.00001
 #python script_train_fixed_params.py -expt_name kidfail -output_folder /app/tft_outputs -use_gpu yes -use_testing_mode no -klein no -num_encoder_steps 10 -n_timesteps_forecasting 3 -timeseries_interval 24 -input_t_dim 60 -num_epochs 1000 -lr 0.000001

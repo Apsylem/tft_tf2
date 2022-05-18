@@ -124,7 +124,6 @@ class KidfailFormatter(GenericDataFormatter):
     #('fall_kreaNormRangeMin', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
     #('fall_kreaNormRangeMax', DataTypes.REAL_VALUED, InputTypes.STATIC_INPUT),
     ('icd', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
-    ('icd_17_9x', DataTypes.CATEGORICAL, InputTypes.TARGET),
     ('dow', DataTypes.CATEGORICAL, InputTypes.KNOWN_INPUT),
     
     ]
@@ -141,9 +140,18 @@ class KidfailFormatter(GenericDataFormatter):
       ('Region', DataTypes.CATEGORICAL, InputTypes.STATIC_INPUT),
     ]"""
 
-  def __init__(self,root_folder,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60,num_epochs = 200, lr = 0.0001):
+  def __init__(self,root_folder,klein=False,num_encoder_steps = 36,n_timesteps_forecasting=10, timeseries_interval = 6, input_t_dim = 60,num_epochs = 200, lr = 0.0001,multiclass=False):
     """Initialises formatter."""
-
+    if not multiclass:
+      self._column_definition+=[('icd_17_9x', DataTypes.CATEGORICAL, InputTypes.TARGET)]
+      base_data_prefix = ''
+    else:
+      self._column_definition+=[('IcdN17_91', DataTypes.CATEGORICAL, InputTypes.TARGET),
+                                ('IcdN17_92', DataTypes.CATEGORICAL, InputTypes.TARGET),
+                                ('IcdN17_93', DataTypes.CATEGORICAL, InputTypes.TARGET),]
+      base_data_prefix = 'multiclass_'
+      
+    self.multiclass = multiclass
     self.identifiers = None
     self._real_scalers = None
     self._cat_scalers = None
@@ -158,16 +166,16 @@ class KidfailFormatter(GenericDataFormatter):
     self.num_epochs = num_epochs
     self.lr = lr
     if klein:
-      self.train_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/train_kidfail.csv'
-      self.valid_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/valid_kidfail.csv'
-      self.test_csv_path = root_folder+'/data/kidfail/klein_itd_60_ntsf40_ti6h/test_kidfail.csv'
+      self.train_csv_path = root_folder+f'/data/kidfail/{base_data_prefix}klein_itd_60_ntsf40_ti6h/train_kidfail.csv'
+      self.valid_csv_path = root_folder+f'/data/kidfail/{base_data_prefix}klein_itd_60_ntsf40_ti6h/valid_kidfail.csv'
+      self.test_csv_path = root_folder+f'/data/kidfail/{base_data_prefix}klein_itd_60_ntsf40_ti6h/test_kidfail.csv'
       #self.train_csv_path = root_folder+'/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv'
       #self.valid_csv_path = root_folder+'/data/kidfail/valid_kidfail_5d8e1a34_e6140289.csv'
       #self.test_csv_path = root_folder+'/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv'
     else:
       
       tft_path = root_folder+f'/data/kidfail'
-      output_folder = os.path.join(tft_path,f'itd_{input_t_dim}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}h')
+      output_folder = os.path.join(tft_path,f'{base_data_prefix}itd_{input_t_dim}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}h')
       self.train_csv_path = os.path.join(output_folder,"train_kidfail.csv")
       self.valid_csv_path = os.path.join(output_folder,"valid_kidfail.csv")
       self.test_csv_path = os.path.join(output_folder,"test_kidfail.csv")
@@ -176,6 +184,10 @@ class KidfailFormatter(GenericDataFormatter):
     # %%
     #import pandas as pd
     #train = pd.read_csv('/home/alexander/time_fusion_transformer/tft_outputs/data/kidfail/train_kidfail_5d8e1a34_e6140289.csv', index_col=0)
+    #test = pd.read_csv('/home/alexander/time_fusion_transformer/tft_outputs/data/kidfail/test_kidfail_5d8e1a34_e6140289.csv', index_col=0)
+    # %%
+    #set(test['id_combined']).intersection(set(train['id_combined']))
+    # %%
     #train['icd_17_9x'] = train['icd_17_9x'].fillna(0) 
     #train.to_csv('/home/alexander/time_fusion_transformer/tft_outputs/data/kidfail/train_kidfail_5d8e1a34_e6140289xx.csv')
     #pd.unique(train['icd_17_9x'])
@@ -243,7 +255,8 @@ class KidfailFormatter(GenericDataFormatter):
                                                    column_definitions)
     
     target_column = utils.get_single_col_by_input_type(InputTypes.TARGET,
-                                                       column_definitions)
+                                                       column_definitions,
+                                                       skip_assert_single_col = self.multiclass)
     
     # Extract identifiers in case required
     self.identifiers = list(df[id_column].unique())
@@ -291,13 +304,13 @@ class KidfailFormatter(GenericDataFormatter):
       Transformed data frame.
 
     """
-    # %%
+    
     #from tft_tf2.util.general_util import dev_pickle
     #dev_pickle((self, df,name),"transform_inputs")
     #from util.general_util import dev_pickle
     #dev_pickle((self, df),"transform_inputs")
     #(self, df,name) = dev_pickle(False,"transform_inputs")
-    # %%
+    
     output = df.copy()
 
     if self._real_scalers is None and self._cat_scalers is None:
@@ -313,10 +326,7 @@ class KidfailFormatter(GenericDataFormatter):
     categorical_inputs = utils.extract_cols_from_data_type(
         DataTypes.CATEGORICAL, column_definitions,
         {InputTypes.ID, InputTypes.TIME})
-    # %%
-    real_inputs
-    categorical_inputs
-    # %%
+    
     # Format real inputs
     output[real_inputs] = self._real_scalers.transform(df[real_inputs].values)
 
@@ -359,11 +369,13 @@ class KidfailFormatter(GenericDataFormatter):
         assert 0==output[col].isna().sum()
      
     output = output.fillna(0)
+   
     
-    # category 4 gets assigned to missing values, so we need to remove them by imputing 0
-    output['icd_17_9x'] = output['icd_17_9x'].replace(4,0)
+    if not self.multiclass:
+      # category 4 gets assigned to missing values, so we need to remove them by imputing 0
+      output['icd_17_9x'] = output['icd_17_9x'].replace(4,0)
     #pd.unique(output['icd_17_9x'])
-    # %%
+    
     return output
 
   def format_predictions(self, predictions):
@@ -407,9 +419,9 @@ class KidfailFormatter(GenericDataFormatter):
 
     model_params = {
         'dropout_rate': 0.3,
-        'hidden_layer_size': 128,
+        'hidden_layer_size': 32,
         'learning_rate': self.lr,
-        'minibatch_size': 64,
+        'minibatch_size': 256,
         'max_gradient_norm': 0.01,
         'num_heads': 1,
         'stack_size': 1
