@@ -49,15 +49,15 @@ def get_single_col_by_input_type(input_type, column_definition,skip_assert_singl
   """
  
   # %%
-  #from util.general_util import dev_pickle
+  #from tft_tf2.util.general_util import dev_pickle
 
-  #(input_type, column_definition,assert_single_col) = dev_pickle(False,"get_single_col_by_input_type")
+  #(input_type, column_definition) = dev_pickle(False,"get_single_col_by_input_type")
   # %%
   l = [tup[0] for tup in column_definition if tup[2] == input_type]
-  # %%
+  
   if not skip_assert_single_col:
     if len(l) != 1:
-      #dev_pickle((input_type, column_definition,assert_single_col),"get_single_col_by_input_type")
+      #dev_pickle((input_type, column_definition),"get_single_col_by_input_type")
       raise ValueError('Invalid number of columns for {}'.format(input_type))
 
     return l[0]

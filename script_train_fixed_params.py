@@ -290,10 +290,11 @@ def main(expt_name,
         output_map = model.predict(test, return_targets=True, sess=sess)
         
         # %%
-        from util.general_util import dev_pickle
-        dev_pickle((output_map,data_formatter),"formatting")
-        (output_map,data_formatter) = dev_pickle(False,"formatting")
+        #from util.general_util import dev_pickle
+        #dev_pickle((output_map,data_formatter),"formatting", False)
+        #(output_map,data_formatter) = dev_pickle(False,"formatting")
         
+        # %%
         if modeling_type=='regression':
             targets = data_formatter.format_predictions(output_map["targets"])
             p50_forecast = data_formatter.format_predictions(output_map["p50"])
@@ -431,18 +432,18 @@ if __name__ == "__main__":
                         input_t_dim = input_t_dim,
                         num_epochs = num_epochs,
                         lr = lr,
-                        multiclass=True)
+                        multiclass=False)
     # Customise inputs to main() for new datasets.
     
     main(
         expt_name=name,
         use_gpu=use_tensorflow_with_gpu,
-        model_folder=os.path.join(config.model_folder,f"multi_{use_testing_mode}_itd_{input_t_dim}_nes_{num_encoder_steps}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}_lr_{lr}_32"),
+        model_folder=os.path.join(config.model_folder,f"binary_{use_testing_mode}_itd_{input_t_dim}_nes_{num_encoder_steps}_ntsf{n_timesteps_forecasting}_ti{timeseries_interval}_klein_{klein}_lr_{lr}_16"),
         data_csv_path=config.data_csv_path,
         data_formatter=formatter,
         use_testing_mode=use_testing_mode,
-        #modeling_type='binary_classification',
-        modeling_type='multiclass_classification',
+        modeling_type='binary_classification',
+        #modeling_type='multiclass_classification',
         #modeling_type='regression',
         )  # Change to false to use original default params
     # %%

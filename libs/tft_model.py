@@ -1343,9 +1343,9 @@ class TemporalFusionTransformer(object):
         data, labels, active_flags = _unpack(train_data)
         val_data, val_labels, val_flags = _unpack(valid_data)
         # %%
-        from tft_tf2.util.general_util import dev_pickle
-        dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection", False)
-        (data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
+        #from tft_tf2.util.general_util import dev_pickle
+        #dev_pickle((data, labels, active_flags,val_data, val_labels, val_flags),"inspection", False)
+        #(data, labels, active_flags,val_data, val_labels, val_flags) = dev_pickle(False,"inspection")
         # %%
         # set the sample weight according to label occurence in training data
         # %%
@@ -1547,7 +1547,7 @@ class TemporalFusionTransformer(object):
         # Format output_csv
         #if self.output_size != 1:
         #    raise NotImplementedError('Current version only supports 1D targets!')
-
+        # %%
         def format_outputs(prediction):
             """Returns formatted dataframes for prediction."""
 
@@ -1563,7 +1563,8 @@ class TemporalFusionTransformer(object):
 
             # Arrange in order
             return flat_prediction[['forecast_time', 'identifier'] + cols]
-
+        
+       
         # Extract predictions for each quantile into different entries
         if self.modeling_type=='regression':
             process_map = {
@@ -1580,7 +1581,18 @@ class TemporalFusionTransformer(object):
         target_cols = self._get_single_col_by_type(InputTypes.TARGET)
         
         formatted_output = {k: format_outputs(process_map[k]) for k in process_map}
-        formatted_output['target_cols'] = target_cols
+        formatted_output = {}
+        
+        #from tft_tf2.util.general_util import dev_pickle
+        #dev_pickle((process_map,target_cols),"pred_format")
+        #(process_map,target_cols) = dev_pickle(False,"pred_format")
+        
+        for k in process_map:
+            selected_output= process_map[k]
+            for target_col,i in zip(target_cols,range(selected_output.shape[-1])):
+                formatted_output[target_col+'_'+k] = format_outputs(selected_output[:,:,[i]])
+        
+        #formatted_output['target_cols'] = target_cols
         return formatted_output
 
     def get_attention(self, df):
