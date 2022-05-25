@@ -1512,28 +1512,37 @@ class TemporalFusionTransformer(object):
                 use_multiprocessing=True,
                 batch_size=self.minibatch_size)
         else:
-            mean_list = []
-            mode_list = []
-            
             n_batches = inputs.shape[0]//self.minibatch_size
             n_batches_range = range(n_batches)
             
-            for batch in n_batches_range:
-                if not batch==(n_batches-1):
-                    begin = batch*self.minibatch_size
-                    end = begin + self.minibatch_size
-                    sel = inputs[begin:end]
-                else:
-                    begin = batch*self.minibatch_size
-                    sel = inputs[begin:]
-               
-                mean_list.append(self.model.outputs[0].mean().eval(feed_dict={self.model.inputs[0]:sel}))
-                mode_list.append(self.model.outputs[0].mode().eval(feed_dict={self.model.inputs[0]:sel}))
-            process_map = {
-            'mean': np.concatenate(mean_list, axis=0),
-            'mode': np.concatenate(mode_list, axis=0)   
-            }
-            assert inputs.shape[0]==process_map['mean'].shape[0]
+            if n_batches>0:
+                mean_list = []
+                mode_list = []
+                
+                n_batches = inputs.shape[0]//self.minibatch_size
+                n_batches_range = range(n_batches)
+                
+                for batch in n_batches_range:
+                    if not batch==(n_batches-1):
+                        begin = batch*self.minibatch_size
+                        end = begin + self.minibatch_size
+                        sel = inputs[begin:end]
+                    else:
+                        begin = batch*self.minibatch_size
+                        sel = inputs[begin:]
+                
+                    mean_list.append(self.model.outputs[0].mean().eval(feed_dict={self.model.inputs[0]:sel}))
+                    mode_list.append(self.model.outputs[0].mode().eval(feed_dict={self.model.inputs[0]:sel}))
+                process_map = {
+                'mean': np.concatenate(mean_list, axis=0),
+                'mode': np.concatenate(mode_list, axis=0)   
+                }
+                assert inputs.shape[0]==process_map['mean'].shape[0]
+            else:
+                process_map = {
+                'mean': self.model.outputs[0].mean().eval(feed_dict={self.model.inputs[0]:inputs}),
+                'mode': self.model.outputs[0].mode().eval(feed_dict={self.model.inputs[0]:inputs})
+                }
         
         #template = self.model.outputs[0].mean().eval(feed_dict={self.model.inputs[0]:inputs})
         # %%
